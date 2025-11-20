@@ -78,10 +78,38 @@ async function handleVoiceCallEvent(data: any) {
   const callSid = data.CallSid
   const callStatus = data.CallStatus // initiated, ringing, in-progress, completed, busy, failed, no-answer, canceled
   const callDuration = data.CallDuration ? parseInt(data.CallDuration) : 0
+  const answeredBy = data.AnsweredBy // human, machine_start, machine_end_beep, machine_end_silence, machine_end_other, fax, unknown
   const to = data.To
   const from = data.From
   
   console.log(`🔄 Processing voice call event: ${callStatus}`)
+  if (answeredBy) {
+    console.log(`🤖 Answered by: ${answeredBy}`)
+  }
+  
+  // VOICEMAIL DETECTION: If machine detected, hang up immediately and mark as declined
+  if (answeredBy && answeredBy.startsWith('machine')) {
+    console.log(`📞 VOICEMAIL DETECTED for ${to} - hanging up to prevent leaving message`)
+    
+    // Hang up the call immediately to prevent leaving voicemail
+    try {
+      const twilio = require('twilio')
+      const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+      await twilioClient.calls(callSid).update({ status: 'completed' })
+      console.log(`✅ Call hung up successfully`)
+    } catch (hangupError) {
+      console.error(`⚠️ Failed to hang up call:`, hangupError)
+    }
+    
+    await updateCallLog(callSid, {
+      call_status: 'voicemail-detected',
+      answered: false,
+      duration_seconds: 0,
+      ended_at: new Date().toISOString(),
+    })
+    await updateRecipientStatus(callSid, 'failed', 'Call declined (voicemail)')
+    return // Don't process further
+  }
   
   // Check for definitive failure statuses - Twilio tells us exactly what happened
   if (['busy', 'failed', 'no-answer', 'canceled'].includes(callStatus)) {

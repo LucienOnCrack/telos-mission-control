@@ -147,8 +147,13 @@ export async function initiateVoiceCall(
       twiml,
       statusCallback: finalWebhookUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-      statusCallbackMethod: 'POST'
-    })
+      statusCallbackMethod: 'POST',
+      // MUST use AMD to detect voicemail and prevent leaving messages
+      machineDetection: 'DetectMessageEnd',
+      asyncAmd: 'true',
+      asyncAmdStatusCallback: finalWebhookUrl,
+      asyncAmdStatusCallbackMethod: 'POST'
+    } as any)
 
     logSuccess(context, {
       callSid: call.sid,
