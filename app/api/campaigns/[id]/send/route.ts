@@ -91,23 +91,24 @@ export async function POST(
 
 // Send campaign messages in the background with comprehensive error logging
 async function sendCampaignMessages(campaign: any, recipients: any[]) {
-  let successCount = 0
-  let failCount = 0
+  const startTime = new Date()
   const errors: any[] = []
 
   console.log('═'.repeat(80))
   console.log(`🚀 STARTING CAMPAIGN: ${campaign.id}`)
   console.log(`📊 Type: ${campaign.type}`)
   console.log(`👥 Recipients: ${recipients.length}`)
-  console.log(`⏰ Started: ${new Date().toISOString()}`)
+  console.log(`⏰ Started: ${startTime.toISOString()}`)
+  console.log(`🔥 MODE: PARALLEL (All calls at once!)`)
   console.log('═'.repeat(80))
 
-  for (let i = 0; i < recipients.length; i++) {
-    const recipient = recipients[i]
-    const phoneNumber = recipient.contact.phone_number
-    const recipientNumber = i + 1
-    
-    console.log(`\n📞 [${recipientNumber}/${recipients.length}] Processing: ${phoneNumber}`)
+  // Process all recipients in parallel
+  const results = await Promise.allSettled(
+    recipients.map(async (recipient, i) => {
+      const phoneNumber = recipient.contact.phone_number
+      const recipientNumber = i + 1
+      
+      console.log(`\n📞 [${recipientNumber}/${recipients.length}] Processing: ${phoneNumber}`)
     
     try {
       if (campaign.type === "sms") {

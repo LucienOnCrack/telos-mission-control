@@ -146,7 +146,7 @@ export async function initiateVoiceCall(
       twiml,
       statusCallback: finalWebhookUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-      statusCallbackMethod: 'POST',
+      statusCallbackMethod: 'POST'
     })
 
     logSuccess(context, {
