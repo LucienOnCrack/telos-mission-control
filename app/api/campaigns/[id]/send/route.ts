@@ -109,8 +109,8 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
       const recipientNumber = i + 1
       
       console.log(`\n📞 [${recipientNumber}/${recipients.length}] Processing: ${phoneNumber}`)
-    
-    try {
+      
+      try {
       if (campaign.type === "sms") {
         console.log(`📱 Sending SMS to ${phoneNumber}...`)
         
@@ -140,8 +140,8 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
             })
             .eq("id", recipient.id)
           
-          failCount++
           console.log(`❌ [${recipientNumber}/${recipients.length}] FAILED: ${phoneNumber}`)
+          return { success: false, phone: phoneNumber, error: result.error }
         } else {
           // Mark as sent
           console.log(`✅ SMS sent to ${phoneNumber} (SID: ${result.data?.sid})`)
@@ -155,8 +155,8 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
             })
             .eq("id", recipient.id)
           
-          successCount++
           console.log(`✅ [${recipientNumber}/${recipients.length}] SUCCESS: ${phoneNumber}`)
+          return { success: true, phone: phoneNumber }
         }
         
       } else if (campaign.type === "voice") {
@@ -182,8 +182,7 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
             })
             .eq("id", recipient.id)
           
-          failCount++
-          continue
+          return { success: false, phone: phoneNumber, error: errorMsg }
         }
         
         const result = await initiateVoiceCall(
@@ -214,8 +213,8 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
             })
             .eq("id", recipient.id)
           
-          failCount++
           console.log(`❌ [${recipientNumber}/${recipients.length}] FAILED: ${phoneNumber}`)
+          return { success: false, phone: phoneNumber, error: result.error }
         } else {
           // Mark as sent and create call log
           console.log(`✅ Call initiated to ${phoneNumber} (CallSid: ${result.callSid})`)
@@ -246,8 +245,8 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
             }
           }
 
-          successCount++
           console.log(`✅ [${recipientNumber}/${recipients.length}] SUCCESS: ${phoneNumber}`)
+          return { success: true, phone: phoneNumber }
         }
         
       } else if (campaign.type === "whatsapp") {
@@ -264,7 +263,7 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
           })
           .eq("id", recipient.id)
         
-        failCount++
+        return { success: false, phone: phoneNumber, error: errorMsg }
       }
 
       
@@ -292,6 +291,7 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
         .eq("id", recipient.id)
       
       return { success: false, phone: phoneNumber, error }
+      }
     })
   )
 
