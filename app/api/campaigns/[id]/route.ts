@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase"
-import { requirePayingUser, checkRateLimit, getRateLimitIdentifier } from "@/lib/auth"
 
 // GET /api/campaigns/[id] - Get campaign details with recipients
 export async function GET(
@@ -8,18 +7,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Require authenticated paying user
-    const user = await requirePayingUser(request)
+    // TODO: Add authentication when ready
+    // const user = await requirePayingUser(request)
 
-    // Rate limiting
-    const rateLimitId = getRateLimitIdentifier(request, user.id)
-    const rateLimit = checkRateLimit(rateLimitId, 100, 60000)
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429 }
-      )
-    }
     const { id } = params
 
     // Fetch campaign

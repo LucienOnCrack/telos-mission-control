@@ -40,12 +40,21 @@ export default function ContactsPage() {
     try {
       setLoading(true)
       const response = await fetch("/api/contacts")
+      
+      if (!response.ok) {
+        const data = await response.json()
+        console.error("❌ Failed to fetch contacts:", data)
+        alert(`Error fetching contacts:\n${data.error || 'Unknown error'}\n\nPlease check the console for details.`)
+        return
+      }
+      
       const data = await response.json()
       if (data.contacts) {
         setContacts(data.contacts)
       }
-    } catch (error) {
-      console.error("Error fetching contacts:", error)
+    } catch (error: any) {
+      console.error("❌ CRITICAL ERROR fetching contacts:", error)
+      alert(`Critical error fetching contacts:\n${error.message || error}\n\nPlease check your network connection and try again.`)
     } finally {
       setLoading(false)
     }
@@ -54,6 +63,8 @@ export default function ContactsPage() {
   const handleAddContact = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
+
+    console.log(`📞 Adding contact: ${phoneNumber}${name ? ` (${name})` : ''}`)
 
     try {
       const response = await fetch("/api/contacts", {
@@ -70,25 +81,33 @@ export default function ContactsPage() {
       const data = await response.json()
 
       if (response.ok) {
+        console.log(`✅ Contact added successfully:`, data.contact)
+        alert(`✅ Success!\n\nContact added: ${phoneNumber}${name ? ` (${name})` : ''}`)
         setContacts([...contacts, data.contact])
         setDialogOpen(false)
         setPhoneNumber("")
         setName("")
       } else {
-        alert(data.error || "Failed to add contact")
+        console.error(`❌ Failed to add contact:`, data)
+        alert(`❌ Error adding contact:\n\n${data.error || 'Unknown error'}\n\nDetails:\n- Phone: ${phoneNumber}\n- Status: ${response.status}\n\nPlease check the phone number format (must be E.164 format like +12345678901)`)
       }
-    } catch (error) {
-      console.error("Error adding contact:", error)
-      alert("Failed to add contact")
+    } catch (error: any) {
+      console.error("❌ CRITICAL ERROR adding contact:", error)
+      alert(`❌ Critical error adding contact:\n\n${error.message || error}\n\nPhone: ${phoneNumber}\n\nPlease check your network connection and try again.`)
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleDeleteContact = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this contact?")) {
+    const contact = contacts.find((c) => c.id === id)
+    const contactInfo = contact ? `${contact.phone_number}${contact.name ? ` (${contact.name})` : ''}` : id
+    
+    if (!confirm(`⚠️ Are you sure you want to delete this contact?\n\n${contactInfo}\n\nThis action cannot be undone.`)) {
       return
     }
+
+    console.log(`🗑️ Deleting contact: ${contactInfo}`)
 
     try {
       const response = await fetch(`/api/contacts?id=${id}`, {
@@ -96,13 +115,17 @@ export default function ContactsPage() {
       })
 
       if (response.ok) {
+        console.log(`✅ Contact deleted: ${contactInfo}`)
+        alert(`✅ Contact deleted successfully:\n\n${contactInfo}`)
         setContacts(contacts.filter((c) => c.id !== id))
       } else {
-        alert("Failed to delete contact")
+        const data = await response.json()
+        console.error(`❌ Failed to delete contact:`, data)
+        alert(`❌ Error deleting contact:\n\n${data.error || 'Unknown error'}\n\nContact: ${contactInfo}\nStatus: ${response.status}`)
       }
-    } catch (error) {
-      console.error("Error deleting contact:", error)
-      alert("Failed to delete contact")
+    } catch (error: any) {
+      console.error("❌ CRITICAL ERROR deleting contact:", error)
+      alert(`❌ Critical error deleting contact:\n\n${error.message || error}\n\nContact: ${contactInfo}`)
     }
   }
 

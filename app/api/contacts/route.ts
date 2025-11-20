@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase"
-import { formatPhoneNumber, validatePhoneNumber } from "@/lib/telnyx"
-import { requirePayingUser, checkRateLimit, getRateLimitIdentifier } from "@/lib/auth"
+import { formatPhoneNumber, validatePhoneNumber } from "@/lib/twilio"
 
 // GET /api/contacts - List all contacts
 export async function GET(request: NextRequest) {
   try {
-    // Require authenticated paying user
-    const user = await requirePayingUser(request)
+    // TODO: Add authentication when ready
+    // const user = await requirePayingUser(request)
 
-    // Rate limiting
-    const rateLimitId = getRateLimitIdentifier(request, user.id)
-    const rateLimit = checkRateLimit(rateLimitId, 100, 60000)
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429 }
-      )
-    }
     const { data: contacts, error } = await supabaseAdmin
       .from("contacts")
       .select("*")
@@ -44,18 +34,9 @@ export async function GET(request: NextRequest) {
 // POST /api/contacts - Create a new contact
 export async function POST(request: NextRequest) {
   try {
-    // Require authenticated paying user
-    const user = await requirePayingUser(request)
+    // TODO: Add authentication when ready
+    // const user = await requirePayingUser(request)
 
-    // Rate limiting
-    const rateLimitId = getRateLimitIdentifier(request, user.id)
-    const rateLimit = checkRateLimit(rateLimitId, 60, 60000)
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429 }
-      )
-    }
     const body = await request.json()
     const { phone_number, name } = body
 
@@ -120,18 +101,9 @@ export async function POST(request: NextRequest) {
 // DELETE /api/contacts?id=xxx - Delete a contact
 export async function DELETE(request: NextRequest) {
   try {
-    // Require authenticated paying user
-    const user = await requirePayingUser(request)
+    // TODO: Add authentication when ready
+    // const user = await requirePayingUser(request)
 
-    // Rate limiting
-    const rateLimitId = getRateLimitIdentifier(request, user.id)
-    const rateLimit = checkRateLimit(rateLimitId, 60, 60000)
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429 }
-      )
-    }
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get("id")
 

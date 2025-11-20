@@ -17,12 +17,20 @@ import { supabaseAdmin } from "@/lib/supabase"
  * Or use an external cron service to call this endpoint
  */
 export async function GET(request: NextRequest) {
+  const timestamp = new Date().toISOString()
+  
+  console.log('═'.repeat(80))
+  console.log(`⏰ CRON JOB TRIGGERED: Checking scheduled campaigns`)
+  console.log(`⏰ Timestamp: ${timestamp}`)
+  console.log('═'.repeat(80))
+  
   try {
     // Verify cron secret to prevent unauthorized access
     const authHeader = request.headers.get("authorization")
     const cronSecret = process.env.CRON_SECRET
 
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      console.error(`❌ Unauthorized cron access attempt`)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

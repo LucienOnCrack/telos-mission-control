@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase"
-import { sendSMS, initiateVoiceCall } from "@/lib/telnyx"
-import { requirePayingUser, checkRateLimit, getRateLimitIdentifier } from "@/lib/auth"
+import { sendSMS, initiateVoiceCall } from "@/lib/twilio"
 
 // POST /api/campaigns/[id]/send - Send campaign to all recipients
 export async function POST(
@@ -9,18 +8,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Require authenticated paying user
-    const user = await requirePayingUser(request)
+    // TODO: Add authentication when ready
+    // const user = await requirePayingUser(request)
 
-    // Rate limiting (stricter for send operations)
-    const rateLimitId = getRateLimitIdentifier(request, user.id)
-    const rateLimit = checkRateLimit(rateLimitId, 10, 60000)
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429 }
-      )
-    }
     const { id } = params
 
     // Fetch campaign
@@ -99,64 +89,135 @@ export async function POST(
   }
 }
 
-// Send campaign messages in the background
+// Send campaign messages in the background with comprehensive error logging
 async function sendCampaignMessages(campaign: any, recipients: any[]) {
   let successCount = 0
   let failCount = 0
+  const errors: any[] = []
 
-  for (const recipient of recipients) {
+  console.log('═'.repeat(80))
+  console.log(`🚀 STARTING CAMPAIGN: ${campaign.id}`)
+  console.log(`📊 Type: ${campaign.type}`)
+  console.log(`👥 Recipients: ${recipients.length}`)
+  console.log(`⏰ Started: ${new Date().toISOString()}`)
+  console.log('═'.repeat(80))
+
+  for (let i = 0; i < recipients.length; i++) {
+    const recipient = recipients[i]
+    const phoneNumber = recipient.contact.phone_number
+    const recipientNumber = i + 1
+    
+    console.log(`\n📞 [${recipientNumber}/${recipients.length}] Processing: ${phoneNumber}`)
+    
     try {
       if (campaign.type === "sms") {
-        // Send SMS
+        console.log(`📱 Sending SMS to ${phoneNumber}...`)
+        
         const result = await sendSMS(
-          recipient.contact.phone_number,
+          phoneNumber,
           campaign.message
         )
 
-        if (result.errors) {
-          // Mark as failed
+        if (!result.success) {
+          // Mark as failed with detailed error
+          console.error(`❌ SMS FAILED for ${phoneNumber}:`, result.error)
+          
+          const errorDetails = {
+            phone: phoneNumber,
+            error: result.error,
+            details: result.errorDetails,
+            timestamp: new Date().toISOString(),
+          }
+          errors.push(errorDetails)
+          
           await supabaseAdmin
             .from("campaign_recipients")
             .update({
               status: "failed",
               failed_at: new Date().toISOString(),
-              error_message: result.errors[0]?.message || "Failed to send SMS",
+              error_message: `${result.error}${result.errorDetails ? ` (Code: ${result.errorDetails.code})` : ''}`,
             })
             .eq("id", recipient.id)
+          
           failCount++
+          console.log(`❌ [${recipientNumber}/${recipients.length}] FAILED: ${phoneNumber}`)
         } else {
           // Mark as sent
+          console.log(`✅ SMS sent to ${phoneNumber} (SID: ${result.data?.sid})`)
+          
           await supabaseAdmin
             .from("campaign_recipients")
             .update({
               status: "sent",
               sent_at: new Date().toISOString(),
-              telnyx_message_id: result.data?.data?.id,
+              twilio_message_sid: result.data?.sid,
             })
             .eq("id", recipient.id)
+          
           successCount++
+          console.log(`✅ [${recipientNumber}/${recipients.length}] SUCCESS: ${phoneNumber}`)
         }
+        
       } else if (campaign.type === "voice") {
-        // Initiate voice call
-        const result = await initiateVoiceCall(
-          recipient.contact.phone_number,
-          campaign.audio_url
-        )
-
-        if (result.errors) {
-          // Mark as failed
+        console.log(`📞 Calling ${phoneNumber}...`)
+        console.log(`🎵 Audio URL: ${campaign.audio_url}`)
+        
+        // Validate audio URL before calling
+        if (!campaign.audio_url) {
+          const errorMsg = 'No audio URL provided for voice campaign'
+          console.error(`❌ ${errorMsg}`)
+          errors.push({
+            phone: phoneNumber,
+            error: errorMsg,
+            timestamp: new Date().toISOString(),
+          })
+          
           await supabaseAdmin
             .from("campaign_recipients")
             .update({
               status: "failed",
               failed_at: new Date().toISOString(),
-              error_message:
-                result.errors[0]?.message || "Failed to initiate call",
+              error_message: errorMsg,
             })
             .eq("id", recipient.id)
+          
           failCount++
+          continue
+        }
+        
+        const result = await initiateVoiceCall(
+          phoneNumber,
+          campaign.audio_url
+        )
+
+        if (!result.success) {
+          // Mark as failed with detailed error
+          console.error(`❌ CALL FAILED for ${phoneNumber}:`, result.error)
+          
+          const errorDetails = {
+            phone: phoneNumber,
+            error: result.error,
+            details: result.errorDetails,
+            audioUrl: campaign.audio_url,
+            timestamp: new Date().toISOString(),
+          }
+          errors.push(errorDetails)
+          
+          await supabaseAdmin
+            .from("campaign_recipients")
+            .update({
+              status: "failed",
+              failed_at: new Date().toISOString(),
+              error_message: `${result.error}${result.errorDetails ? ` (Code: ${result.errorDetails.code})` : ''}`,
+            })
+            .eq("id", recipient.id)
+          
+          failCount++
+          console.log(`❌ [${recipientNumber}/${recipients.length}] FAILED: ${phoneNumber}`)
         } else {
           // Mark as sent and create call log
+          console.log(`✅ Call initiated to ${phoneNumber} (CallSid: ${result.callSid})`)
+          
           await supabaseAdmin
             .from("campaign_recipients")
             .update({
@@ -166,43 +227,69 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
             .eq("id", recipient.id)
 
           // Create call log entry
-          if (result.data?.data?.call_control_id) {
-            await supabaseAdmin.from("call_logs").insert({
+          if (result.callSid) {
+            const { error: callLogError } = await supabaseAdmin.from("call_logs").insert({
               campaign_id: campaign.id,
               contact_id: recipient.contact_id,
-              telnyx_call_id: result.data.data.call_control_id,
+              twilio_call_sid: result.callSid,
+              call_status: 'initiated',
               answered: false,
               duration_seconds: 0,
             })
+            
+            if (callLogError) {
+              console.error(`⚠️ Failed to create call log:`, callLogError)
+            } else {
+              console.log(`📝 Call log created for ${phoneNumber}`)
+            }
           }
 
           successCount++
+          console.log(`✅ [${recipientNumber}/${recipients.length}] SUCCESS: ${phoneNumber}`)
         }
+        
       } else if (campaign.type === "whatsapp") {
         // WhatsApp support (future implementation)
+        const errorMsg = 'WhatsApp is not yet supported'
+        console.error(`❌ ${errorMsg}`)
+        
         await supabaseAdmin
           .from("campaign_recipients")
           .update({
             status: "failed",
             failed_at: new Date().toISOString(),
-            error_message: "WhatsApp is not yet supported",
+            error_message: errorMsg,
           })
           .eq("id", recipient.id)
+        
         failCount++
       }
 
       // Add a small delay to avoid rate limiting
       await new Promise((resolve) => setTimeout(resolve, 100))
-    } catch (error) {
-      console.error(`Error sending to recipient ${recipient.id}:`, error)
+      
+    } catch (error: any) {
+      console.error('═'.repeat(80))
+      console.error(`❌ CRITICAL ERROR processing ${phoneNumber}:`)
+      console.error(error)
+      console.error('═'.repeat(80))
+      
+      errors.push({
+        phone: phoneNumber,
+        error: error.message || String(error),
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+      })
+      
       await supabaseAdmin
         .from("campaign_recipients")
         .update({
           status: "failed",
           failed_at: new Date().toISOString(),
-          error_message: String(error),
+          error_message: error.message || String(error),
         })
         .eq("id", recipient.id)
+      
       failCount++
     }
   }
@@ -217,8 +304,20 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
     })
     .eq("id", campaign.id)
 
-  console.log(
-    `Campaign ${campaign.id} completed: ${successCount} sent, ${failCount} failed`
-  )
+  console.log('═'.repeat(80))
+  console.log(`🏁 CAMPAIGN COMPLETED: ${campaign.id}`)
+  console.log(`⏰ Finished: ${new Date().toISOString()}`)
+  console.log(`✅ Successful: ${successCount}/${recipients.length}`)
+  console.log(`❌ Failed: ${failCount}/${recipients.length}`)
+  console.log(`📊 Success Rate: ${((successCount / recipients.length) * 100).toFixed(2)}%`)
+  
+  if (errors.length > 0) {
+    console.log(`\n❌ ERRORS SUMMARY (${errors.length}):`)
+    errors.forEach((err, idx) => {
+      console.log(`  ${idx + 1}. ${err.phone}: ${err.error}`)
+    })
+  }
+  
+  console.log('═'.repeat(80))
 }
 

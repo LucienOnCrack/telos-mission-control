@@ -63,12 +63,21 @@ export default function CampaignsPage() {
     try {
       setLoading(true)
       const response = await fetch("/api/campaigns")
+      
+      if (!response.ok) {
+        const data = await response.json()
+        console.error("❌ Failed to fetch campaigns:", data)
+        alert(`Error fetching campaigns:\n${data.error || 'Unknown error'}\n\nPlease check the console for details.`)
+        return
+      }
+      
       const data = await response.json()
       if (data.campaigns) {
         setCampaigns(data.campaigns)
       }
-    } catch (error) {
-      console.error("Error fetching campaigns:", error)
+    } catch (error: any) {
+      console.error("❌ CRITICAL ERROR fetching campaigns:", error)
+      alert(`Critical error fetching campaigns:\n${error.message || error}\n\nPlease check your network connection and try again.`)
     } finally {
       setLoading(false)
     }
@@ -77,12 +86,19 @@ export default function CampaignsPage() {
   const fetchContacts = async () => {
     try {
       const response = await fetch("/api/contacts")
+      
+      if (!response.ok) {
+        const data = await response.json()
+        console.error("❌ Failed to fetch contacts:", data)
+        return
+      }
+      
       const data = await response.json()
       if (data.contacts) {
         setContacts(data.contacts)
       }
-    } catch (error) {
-      console.error("Error fetching contacts:", error)
+    } catch (error: any) {
+      console.error("❌ ERROR fetching contacts:", error)
     }
   }
 
@@ -105,27 +121,44 @@ export default function CampaignsPage() {
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Validation with detailed error messages
     if (selectedContacts.length === 0) {
-      alert("Please select at least one contact")
+      alert("⚠️ No contacts selected\n\nPlease select at least one contact to send the campaign to.")
       return
     }
 
     if (campaignType !== "voice" && !message.trim()) {
-      alert("Please enter a message")
+      alert("⚠️ No message entered\n\nPlease enter a message for your SMS campaign.")
       return
     }
 
     if (campaignType === "voice" && !audioUrl.trim()) {
-      alert("Please enter an audio URL for voice campaigns")
+      alert("⚠️ No audio URL provided\n\nPlease enter an audio file URL for voice campaigns.\n\nSupported formats:\n- WAV (recommended: 8kHz, mono, 16-bit PCM)\n- MP3\n- M4A\n\nThe URL must be publicly accessible (HTTPS).")
+      return
+    }
+
+    // Validate audio URL format for voice campaigns
+    if (campaignType === "voice" && !audioUrl.startsWith("http")) {
+      alert("⚠️ Invalid audio URL\n\nThe audio URL must start with http:// or https://\n\nCurrent URL: " + audioUrl)
       return
     }
 
     setSubmitting(true)
 
+    console.log('═'.repeat(80))
+    console.log(`🚀 Creating ${campaignType.toUpperCase()} campaign`)
+    console.log(`👥 Recipients: ${selectedContacts.length} contacts`)
+    console.log(`⏰ ${scheduleType === "immediate" ? "Immediate send" : "Scheduled"}`)
+    if (campaignType === "voice") {
+      console.log(`🎵 Audio URL: ${audioUrl}`)
+    }
+    console.log('═'.repeat(80))
+
     try {
       let scheduled_for = null
       if (scheduleType === "scheduled" && scheduledDate && scheduledTime) {
         scheduled_for = new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+        console.log(`📅 Scheduled for: ${scheduled_for}`)
       }
 
       const response = await fetch("/api/campaigns", {
@@ -145,24 +178,39 @@ export default function CampaignsPage() {
       const data = await response.json()
 
       if (response.ok) {
+        console.log(`✅ Campaign created successfully:`, data.campaign)
+        
+        alert(`✅ Campaign created!\n\nCampaign ID: ${data.campaign.id}\nType: ${campaignType.toUpperCase()}\nRecipients: ${selectedContacts.length}\n\n${scheduleType === "immediate" ? "Starting calls now..." : "Scheduled successfully!"}`)
+        
         setDialogOpen(false)
         resetForm()
         
         // If immediate, trigger send
         if (scheduleType === "immediate") {
-          await fetch(`/api/campaigns/${data.campaign.id}/send`, {
+          console.log(`🚀 Triggering immediate send...`)
+          
+          const sendResponse = await fetch(`/api/campaigns/${data.campaign.id}/send`, {
             method: "POST",
           })
+          
+          if (!sendResponse.ok) {
+            const sendData = await sendResponse.json()
+            console.error(`❌ Failed to send campaign:`, sendData)
+            alert(`⚠️ Campaign created but failed to send:\n\n${sendData.error || 'Unknown error'}\n\nPlease try sending from the campaign details page.`)
+          } else {
+            console.log(`✅ Campaign send triggered successfully`)
+          }
         }
         
         fetchCampaigns()
         router.push(`/dashboard/campaigns/${data.campaign.id}`)
       } else {
-        alert(data.error || "Failed to create campaign")
+        console.error(`❌ Failed to create campaign:`, data)
+        alert(`❌ Error creating campaign:\n\n${data.error || 'Unknown error'}\n\nDetails:\n- Type: ${campaignType}\n- Recipients: ${selectedContacts.length}\n- Status: ${response.status}\n\nPlease check all fields and try again.`)
       }
-    } catch (error) {
-      console.error("Error creating campaign:", error)
-      alert("Failed to create campaign")
+    } catch (error: any) {
+      console.error("❌ CRITICAL ERROR creating campaign:", error)
+      alert(`❌ Critical error creating campaign:\n\n${error.message || error}\n\nDetails:\n- Type: ${campaignType}\n- Recipients: ${selectedContacts.length}\n\nPlease check your network connection and try again.`)
     } finally {
       setSubmitting(false)
     }
