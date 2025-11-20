@@ -85,18 +85,27 @@ async function handleVoiceCallEvent(data: any) {
 
   try {
     // Find the call log entry
+    console.log(`🔍 Searching for call log with CallSid: ${callSid}`)
     const { data: callLog, error: fetchError } = await supabaseAdmin
       .from("call_logs")
       .select("*")
       .eq("twilio_call_sid", callSid)
       .single()
 
+    console.log(`📊 Call log query result:`, {
+      found: !!callLog,
+      error: fetchError,
+      callLogId: callLog?.id
+    })
+
     if (fetchError || !callLog) {
       console.warn(`⚠️ No call log found for CallSid: ${callSid}`)
+      console.warn(`   Error:`, fetchError)
       console.warn(`   This might be the first event. Creating call log...`)
+      console.warn(`   Searching for recipient with phone: ${to}`)
       
       // Try to find the campaign by phone number
-      const { data: recipient } = await supabaseAdmin
+      const { data: recipient, error: recipientError } = await supabaseAdmin
         .from("campaign_recipients")
         .select("*, campaign:campaigns(*), contact:contacts(*)")
         .eq("contact.phone_number", to)
@@ -104,6 +113,13 @@ async function handleVoiceCallEvent(data: any) {
         .order("created_at", { ascending: false })
         .limit(1)
         .single()
+
+      console.log(`📋 Recipient search result:`, {
+        found: !!recipient,
+        error: recipientError,
+        recipientId: recipient?.id,
+        contactPhone: recipient?.contact?.phone_number
+      })
 
       if (recipient) {
         // Create call log
