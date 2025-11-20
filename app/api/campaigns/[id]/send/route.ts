@@ -235,7 +235,7 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
           console.log(`❌ [${recipientNumber}/${recipients.length}] FAILED: ${phoneNumber}`)
           return { success: false, phone: phoneNumber, error: result.error }
         } else {
-          // Mark as sent and create call log
+          // Mark as sent - webhook will create call log
           console.log(`✅ Call initiated to ${phoneNumber} (CallSid: ${result.callSid})`)
           
           await supabaseAdmin
@@ -246,23 +246,9 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
             })
             .eq("id", recipient.id)
 
-          // Create call log entry
-          if (result.callSid) {
-            const { error: callLogError } = await supabaseAdmin.from("call_logs").insert({
-              campaign_id: campaign.id,
-              contact_id: recipient.contact_id,
-              twilio_call_sid: result.callSid,
-              call_status: 'initiated',
-              answered: false,
-              duration_seconds: 0,
-            })
-            
-            if (callLogError) {
-              console.error(`⚠️ Failed to create call log:`, callLogError)
-            } else {
-              console.log(`📝 Call log created for ${phoneNumber}`)
-            }
-          }
+          // Note: Call log will be created by webhook handler when first event arrives
+          // This prevents race condition where both send API and webhook try to create it
+          console.log(`📝 Webhook will create call log for ${phoneNumber}`)
 
           console.log(`✅ [${recipientNumber}/${recipients.length}] SUCCESS: ${phoneNumber}`)
           return { success: true, phone: phoneNumber }
