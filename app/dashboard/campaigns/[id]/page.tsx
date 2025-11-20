@@ -48,7 +48,10 @@ export default function CampaignDetailsPage() {
   const fetchCampaignDetails = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/campaigns/${campaignId}`)
+      // Add cache-busting to force fresh data
+      const response = await fetch(`/api/campaigns/${campaignId}?t=${Date.now()}`, {
+        cache: 'no-store'
+      })
       const data = await response.json()
       if (data.campaign) {
         setCampaign(data.campaign)

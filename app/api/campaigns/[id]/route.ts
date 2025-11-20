@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase"
 
+// Force dynamic rendering - no caching
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // GET /api/campaigns/[id] - Get campaign details with recipients
 export async function GET(
   request: NextRequest,
