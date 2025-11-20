@@ -5,9 +5,6 @@ import { formatPhoneNumber, validatePhoneNumber } from "@/lib/twilio"
 // GET /api/contacts - List all contacts
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Add authentication when ready
-    // const user = await requirePayingUser(request)
-
     const { data: contacts, error } = await supabaseAdmin
       .from("contacts")
       .select("*")
@@ -22,7 +19,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ contacts })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in GET /api/contacts:", error)
     return NextResponse.json(
       { error: "Internal server error" },
@@ -34,9 +31,6 @@ export async function GET(request: NextRequest) {
 // POST /api/contacts - Create a new contact
 export async function POST(request: NextRequest) {
   try {
-    // TODO: Add authentication when ready
-    // const user = await requirePayingUser(request)
-
     const body = await request.json()
     const { phone_number, name } = body
 
@@ -89,8 +83,14 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ contact }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in POST /api/contacts:", error)
+    if (error.message === "Authentication required") {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+    if (error.message === "Active subscription required") {
+      return NextResponse.json({ error: "Active subscription required" }, { status: 403 })
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -101,9 +101,6 @@ export async function POST(request: NextRequest) {
 // DELETE /api/contacts?id=xxx - Delete a contact
 export async function DELETE(request: NextRequest) {
   try {
-    // TODO: Add authentication when ready
-    // const user = await requirePayingUser(request)
-
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get("id")
 
@@ -128,7 +125,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in DELETE /api/contacts:", error)
     return NextResponse.json(
       { error: "Internal server error" },

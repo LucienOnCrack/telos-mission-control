@@ -138,23 +138,56 @@ export default function ContactsPage() {
       if (!file) return
 
       const text = await file.text()
-      const lines = text.split("\n")
+      const lines = text.split("\n").map((line: string) => line.trim()).filter((line: string) => line)
+      
+      if (lines.length < 2) {
+        alert("CSV must have a header row and at least one data row")
+        return
+      }
+
+      // Parse header row to find phone column
+      const headers = lines[0].split(",").map((h: string) => h.trim().toLowerCase())
+      const phoneIndex = headers.findIndex((h: string) => 
+        h === 'phone' || h === 'phone_number' || h === 'phonenumber'
+      )
+      const nameIndex = headers.findIndex((h: string) => h === 'name')
+
+      if (phoneIndex === -1) {
+        alert(`❌ CSV must have a 'phone' or 'phone_number' column\n\nFound columns: ${headers.join(', ')}`)
+        return
+      }
+
+      console.log(`📊 CSV Structure:`)
+      console.log(`   Headers: ${headers.join(', ')}`)
+      console.log(`   Phone column: ${phoneIndex} (${headers[phoneIndex]})`)
+      console.log(`   Name column: ${nameIndex >= 0 ? `${nameIndex} (${headers[nameIndex]})` : 'not found'}`)
+
       const newContacts: { phone_number: string; name?: string }[] = []
 
+      // Parse data rows
       for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim()
+        const line = lines[i]
         if (!line) continue
 
-        const [phone, name] = line.split(",").map((s: string) => s.trim())
+        const values = line.split(",").map((s: string) => s.trim())
+        const phone = values[phoneIndex]
+        const name = nameIndex >= 0 ? values[nameIndex] : undefined
+
         if (phone) {
-          newContacts.push({ phone_number: phone, name: name || undefined })
+          // Ensure phone has + prefix (will be added by formatPhoneNumber if missing)
+          newContacts.push({ 
+            phone_number: phone.startsWith('+') ? phone : `+${phone}`, 
+            name: name || undefined 
+          })
         }
       }
 
       if (newContacts.length === 0) {
-        alert("No valid contacts found in CSV")
+        alert("❌ No valid contacts found in CSV\n\nMake sure the phone column has values")
         return
       }
+
+      console.log(`📥 Importing ${newContacts.length} contacts...`)
 
       try {
         const response = await fetch("/api/contacts/bulk", {
@@ -168,14 +201,16 @@ export default function ContactsPage() {
         const data = await response.json()
 
         if (response.ok) {
-          alert(`Imported ${data.count} contacts`)
+          console.log(`✅ Successfully imported ${data.count} contacts`)
+          alert(`✅ Successfully imported ${data.count} contacts!${data.errors ? `\n\n⚠️ ${data.errors.length} errors` : ''}`)
           fetchContacts()
         } else {
-          alert(data.error || "Failed to import contacts")
+          console.error(`❌ Import failed:`, data)
+          alert(`❌ Import failed:\n\n${data.error || 'Unknown error'}${data.errors ? `\n\nErrors: ${data.errors.length}` : ''}`)
         }
       } catch (error) {
-        console.error("Error importing contacts:", error)
-        alert("Failed to import contacts")
+        console.error("❌ Error importing contacts:", error)
+        alert("❌ Failed to import contacts - network error")
       }
     }
     input.click()

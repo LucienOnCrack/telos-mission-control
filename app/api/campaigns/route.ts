@@ -4,9 +4,6 @@ import { supabaseAdmin } from "@/lib/supabase"
 // GET /api/campaigns - List all campaigns
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Add authentication when ready
-    // const user = await requirePayingUser(request)
-
     const { data: campaigns, error } = await supabaseAdmin
       .from("campaigns")
       .select("*")
@@ -21,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ campaigns })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in GET /api/campaigns:", error)
     return NextResponse.json(
       { error: "Internal server error" },
@@ -33,11 +30,8 @@ export async function GET(request: NextRequest) {
 // POST /api/campaigns - Create a new campaign
 export async function POST(request: NextRequest) {
   try {
-    // TODO: Add authentication when ready
-    // const user = await requirePayingUser(request)
-
     const body = await request.json()
-    const { type, message, audio_url, contact_ids, scheduled_for } = body
+    const { type, message, audio_url, contact_ids, group_ids, scheduled_for } = body
 
     // Validation
     if (!type || !["sms", "voice", "whatsapp"].includes(type)) {
@@ -61,11 +55,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!contact_ids || !Array.isArray(contact_ids) || contact_ids.length === 0) {
+    // Must have either contact_ids or group_ids
+    if ((!contact_ids || !Array.isArray(contact_ids) || contact_ids.length === 0) &&
+        (!group_ids || !Array.isArray(group_ids) || group_ids.length === 0)) {
       return NextResponse.json(
-        { error: "At least one contact is required" },
+        { error: "At least one contact or group is required" },
         { status: 400 }
       )
+    }
+
+    // Get all contact IDs (either from contact_ids or from groups)
+    let finalContactIds: string[] = []
+
+    if (group_ids && group_ids.length > 0) {
+      // Fetch all contacts from the selected groups
+      const { data: groupContacts, error: groupContactsError } = await supabaseAdmin
+        .from("contacts")
+        .select("id")
+        .in("group_id", group_ids)
+
+      if (groupContactsError) {
+        console.error("Error fetching group contacts:", groupContactsError)
+        return NextResponse.json(
+          { error: "Failed to fetch contacts from groups" },
+          { status: 500 }
+        )
+      }
+
+      finalContactIds = groupContacts?.map(c => c.id) || []
+
+      if (finalContactIds.length === 0) {
+        return NextResponse.json(
+          { error: "No contacts found in selected groups" },
+          { status: 400 }
+        )
+      }
+    } else if (contact_ids && contact_ids.length > 0) {
+      finalContactIds = contact_ids
     }
 
     // Determine initial status
@@ -93,7 +119,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create campaign recipients
-    const recipients = contact_ids.map((contact_id: string) => ({
+    const recipients = finalContactIds.map((contact_id: string) => ({
       campaign_id: campaign.id,
       contact_id,
       status: "pending",
@@ -114,8 +140,14 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ campaign }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in POST /api/campaigns:", error)
+    if (error.message === "Authentication required") {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+    if (error.message === "Authentication required") {
+      return NextResponse.json({ error: "Authentication required" }, { status: 403 })
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { Phone, Send, Music, LayoutDashboard } from "lucide-react"
+import { Phone, Send, Music, LayoutDashboard, Users } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -26,6 +26,11 @@ const menuItems = [
     title: "Contacts",
     url: "/dashboard/contacts",
     icon: Phone,
+  },
+  {
+    title: "Groups",
+    url: "/dashboard/groups",
+    icon: Users,
   },
   {
     title: "Campaigns",

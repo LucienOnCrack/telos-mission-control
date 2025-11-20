@@ -17,6 +17,9 @@ A comprehensive mass messaging and calling platform built with Next.js, React, S
 - 👥 **Contact Database** - Store and manage phone numbers with names
 - 📥 **Bulk Import** - CSV import for adding multiple contacts
 - 🔍 **Contact Organization** - Easy-to-use contact list interface
+- 📋 **Contact Groups** - Organize contacts into groups
+- 🔗 **Formspree Integration** - Automatically add contacts from Formspree forms
+- 🎯 **"Not Contacted Yet" Group** - Automatic tracking of uncontacted leads
 
 ### Campaign Features
 - 🎯 **Targeted Campaigns** - Select specific contacts for each campaign
@@ -106,6 +109,8 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 
 - `/dashboard` - Main dashboard with overview cards and activity feed
 - `/dashboard/contacts` - Contact management (add, import, delete)
+- `/dashboard/groups` - Contact group management
+- `/dashboard/groups/[id]` - View and manage contacts in a specific group
 - `/dashboard/campaigns` - Campaign creation and management
 - `/dashboard/campaigns/[id]` - Campaign details with delivery tracking
 - `/dashboard/audio` - Audio file management for voice campaigns
@@ -115,12 +120,15 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 
 - `/api/contacts` - Contact CRUD operations
 - `/api/contacts/bulk` - Bulk contact import
+- `/api/contact-groups` - Contact group management
+- `/api/contact-groups/[id]` - Group details and contact assignment
 - `/api/campaigns` - Campaign creation and listing
 - `/api/campaigns/[id]` - Campaign details
 - `/api/campaigns/[id]/send` - Trigger campaign sending
 - `/api/audio/upload` - Upload audio files to Vercel Blob
 - `/api/audio/list` - List uploaded audio files
 - `/api/audio/delete` - Delete audio files
+- `/api/formspree/webhook` - Webhook handler for Formspree form submissions
 - `/api/twilio/webhook` - Webhook handler for Twilio events
 - `/api/cron/scheduled-campaigns` - Scheduled campaign processor
 
@@ -182,12 +190,47 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 
 ## Usage Guide
 
+### Adding Contacts
+
+#### Manual Entry
+1. Navigate to Contacts page
+2. Click "Add Contact"
+3. Enter phone numbers in E.164 format (+12345678901)
+
+#### CSV Import
+1. Go to Contacts page
+2. Click "Import CSV"
+3. Upload CSV file with phone_number and name columns
+
+#### Formspree Integration (Automatic)
+1. Set up Formspree webhook (see [FORMSPREE_SETUP.md](./FORMSPREE_SETUP.md))
+2. Contacts are automatically added when forms are submitted
+3. New contacts are automatically added to "Not Contacted Yet" group
+4. See [FORMSPREE_SETUP.md](./FORMSPREE_SETUP.md) for complete setup instructions
+
+### Organizing Contacts with Groups
+
+1. **Create Groups**
+   - Navigate to Groups page
+   - Click "Create Group"
+   - Name your group (e.g., "VIP Customers", "New Leads")
+
+2. **Assign Contacts to Groups**
+   - Go to Contacts page
+   - Select contacts
+   - Assign them to a group
+   - Or edit individual contacts to change their group
+
+3. **"Not Contacted Yet" Group**
+   - Automatically created when using Formspree integration
+   - Automatically populated with contacts who have never been in a campaign
+   - Use this group to target fresh leads
+
 ### Creating Your First Campaign
 
-1. **Add Contacts**
-   - Navigate to Contacts page
-   - Click "Add Contact" or "Import CSV"
-   - Enter phone numbers in E.164 format (+12345678901)
+1. **Choose Recipients**
+   - Select specific contacts
+   - Or target an entire group (e.g., "Not Contacted Yet")
 
 2. **Create SMS Campaign**
    - Go to Campaigns page
@@ -220,6 +263,7 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 - [SETUP.md](./SETUP.md) - Complete setup and configuration guide
 - [TWILIO_SETUP.md](./TWILIO_SETUP.md) - Twilio configuration and voice call setup
 - [AUDIO_SETUP.md](./AUDIO_SETUP.md) - Audio file hosting with Vercel Blob
+- [FORMSPREE_SETUP.md](./FORMSPREE_SETUP.md) - Formspree integration for automatic contact collection
 - [SECURITY.md](./SECURITY.md) - Security implementation details
 - [TEST_PLAN.md](./TEST_PLAN.md) - Comprehensive testing guide
 

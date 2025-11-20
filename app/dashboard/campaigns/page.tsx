@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Send } from "lucide-react"
-import { Campaign, Contact, CampaignType } from "@/lib/supabase"
+import { Campaign, Contact, CampaignType, ContactGroup } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
 interface AudioFile {
@@ -47,6 +47,7 @@ export default function CampaignsPage() {
   const router = useRouter()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [groups, setGroups] = useState<ContactGroup[]>([])
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -56,7 +57,9 @@ export default function CampaignsPage() {
   const [campaignType, setCampaignType] = useState<CampaignType>("sms")
   const [message, setMessage] = useState("")
   const [audioUrl, setAudioUrl] = useState("")
+  const [recipientType, setRecipientType] = useState<"contacts" | "groups">("groups")
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([])
   const [scheduleType, setScheduleType] = useState<"immediate" | "scheduled">(
     "immediate"
   )
@@ -66,6 +69,7 @@ export default function CampaignsPage() {
   useEffect(() => {
     fetchCampaigns()
     fetchContacts()
+    fetchGroups()
     fetchAudioFiles()
   }, [])
 
@@ -112,6 +116,25 @@ export default function CampaignsPage() {
     }
   }
 
+  const fetchGroups = async () => {
+    try {
+      const response = await fetch("/api/contact-groups")
+      
+      if (!response.ok) {
+        const data = await response.json()
+        console.error("❌ Failed to fetch groups:", data)
+        return
+      }
+      
+      const data = await response.json()
+      if (data.groups) {
+        setGroups(data.groups)
+      }
+    } catch (error: any) {
+      console.error("❌ ERROR fetching groups:", error)
+    }
+  }
+
   const fetchAudioFiles = async () => {
     try {
       const response = await fetch("/api/audio/list")
@@ -138,11 +161,27 @@ export default function CampaignsPage() {
     )
   }
 
+  const handleToggleGroup = (groupId: string) => {
+    setSelectedGroups((prev) =>
+      prev.includes(groupId)
+        ? prev.filter((id) => id !== groupId)
+        : [...prev, groupId]
+    )
+  }
+
   const handleSelectAll = () => {
-    if (selectedContacts.length === contacts.length) {
-      setSelectedContacts([])
+    if (recipientType === "contacts") {
+      if (selectedContacts.length === contacts.length) {
+        setSelectedContacts([])
+      } else {
+        setSelectedContacts(contacts.map((c) => c.id))
+      }
     } else {
-      setSelectedContacts(contacts.map((c) => c.id))
+      if (selectedGroups.length === groups.length) {
+        setSelectedGroups([])
+      } else {
+        setSelectedGroups(groups.map((g) => g.id))
+      }
     }
   }
 
@@ -150,8 +189,13 @@ export default function CampaignsPage() {
     e.preventDefault()
 
     // Validation with detailed error messages
-    if (selectedContacts.length === 0) {
+    if (recipientType === "contacts" && selectedContacts.length === 0) {
       alert("⚠️ No contacts selected\n\nPlease select at least one contact to send the campaign to.")
+      return
+    }
+
+    if (recipientType === "groups" && selectedGroups.length === 0) {
+      alert("⚠️ No groups selected\n\nPlease select at least one group to send the campaign to.")
       return
     }
 
@@ -173,9 +217,16 @@ export default function CampaignsPage() {
 
     setSubmitting(true)
 
+    const totalRecipients = recipientType === "contacts" 
+      ? selectedContacts.length 
+      : selectedGroups.reduce((total, groupId) => {
+          const group = groups.find(g => g.id === groupId)
+          return total + (group?.contact_count || 0)
+        }, 0)
+
     console.log('═'.repeat(80))
     console.log(`🚀 Creating ${campaignType.toUpperCase()} campaign`)
-    console.log(`👥 Recipients: ${selectedContacts.length} contacts`)
+    console.log(`👥 Recipients: ${totalRecipients} contacts ${recipientType === "groups" ? `from ${selectedGroups.length} groups` : ""}`)
     console.log(`⏰ ${scheduleType === "immediate" ? "Immediate send" : "Scheduled"}`)
     if (campaignType === "voice") {
       console.log(`🎵 Audio URL: ${audioUrl}`)
@@ -198,7 +249,8 @@ export default function CampaignsPage() {
           type: campaignType,
           message: campaignType !== "voice" ? message : undefined,
           audio_url: campaignType === "voice" ? audioUrl : undefined,
-          contact_ids: selectedContacts,
+          contact_ids: recipientType === "contacts" ? selectedContacts : undefined,
+          group_ids: recipientType === "groups" ? selectedGroups : undefined,
           scheduled_for,
         }),
       })
@@ -208,7 +260,7 @@ export default function CampaignsPage() {
       if (response.ok) {
         console.log(`✅ Campaign created successfully:`, data.campaign)
         
-        alert(`✅ Campaign created!\n\nCampaign ID: ${data.campaign.id}\nType: ${campaignType.toUpperCase()}\nRecipients: ${selectedContacts.length}\n\n${scheduleType === "immediate" ? "Starting calls now..." : "Scheduled successfully!"}`)
+        alert(`✅ Campaign created!\n\nCampaign ID: ${data.campaign.id}\nType: ${campaignType.toUpperCase()}\nRecipients: ~${totalRecipients} contacts\n\n${scheduleType === "immediate" ? "Starting calls now..." : "Scheduled successfully!"}`)
         
         setDialogOpen(false)
         resetForm()
@@ -248,7 +300,9 @@ export default function CampaignsPage() {
     setCampaignType("sms")
     setMessage("")
     setAudioUrl("")
+    setRecipientType("groups")
     setSelectedContacts([])
+    setSelectedGroups([])
     setScheduleType("immediate")
     setScheduledDate("")
     setScheduledTime("")
@@ -423,52 +477,118 @@ export default function CampaignsPage() {
                 )}
 
                 <div className="grid gap-2">
+                  <Label>Recipient Type</Label>
+                  <Select
+                    value={recipientType}
+                    onValueChange={(value: "contacts" | "groups") => {
+                      setRecipientType(value)
+                      setSelectedContacts([])
+                      setSelectedGroups([])
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="groups">Send to Groups</SelectItem>
+                      <SelectItem value="contacts">Send to Individual Contacts</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
                   <div className="flex items-center justify-between">
-                    <Label>Select Recipients ({selectedContacts.length})</Label>
+                    <Label>
+                      {recipientType === "groups" 
+                        ? `Select Groups (${selectedGroups.length})` 
+                        : `Select Contacts (${selectedContacts.length})`}
+                    </Label>
                     <Button
                       type="button"
                       variant="link"
                       size="sm"
                       onClick={handleSelectAll}
                     >
-                      {selectedContacts.length === contacts.length
-                        ? "Deselect All"
-                        : "Select All"}
+                      {recipientType === "groups"
+                        ? (selectedGroups.length === groups.length ? "Deselect All" : "Select All")
+                        : (selectedContacts.length === contacts.length ? "Deselect All" : "Select All")}
                     </Button>
                   </div>
                   <div className="border rounded-md p-4 max-h-60 overflow-y-auto">
-                    {contacts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        No contacts available. Add contacts first.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {contacts.map((contact) => (
-                          <div
-                            key={contact.id}
-                            className="flex items-center space-x-2"
+                    {recipientType === "groups" ? (
+                      groups.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No groups available.{" "}
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="h-auto p-0"
+                            onClick={() => router.push("/dashboard/groups")}
                           >
-                            <Checkbox
-                              id={contact.id}
-                              checked={selectedContacts.includes(contact.id)}
-                              onCheckedChange={() =>
-                                handleToggleContact(contact.id)
-                              }
-                            />
-                            <label
-                              htmlFor={contact.id}
-                              className="text-sm cursor-pointer flex-1"
+                            Create a group
+                          </Button>
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {groups.map((group) => (
+                            <div
+                              key={group.id}
+                              className="flex items-center space-x-2"
                             >
-                              {contact.name || contact.phone_number}
-                              {contact.name && (
+                              <Checkbox
+                                id={group.id}
+                                checked={selectedGroups.includes(group.id)}
+                                onCheckedChange={() =>
+                                  handleToggleGroup(group.id)
+                                }
+                              />
+                              <label
+                                htmlFor={group.id}
+                                className="text-sm cursor-pointer flex-1"
+                              >
+                                {group.name}
                                 <span className="text-muted-foreground ml-2">
-                                  ({contact.phone_number})
+                                  ({group.contact_count || 0} contacts)
                                 </span>
-                              )}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    ) : (
+                      contacts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No contacts available. Add contacts first.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {contacts.map((contact) => (
+                            <div
+                              key={contact.id}
+                              className="flex items-center space-x-2"
+                            >
+                              <Checkbox
+                                id={contact.id}
+                                checked={selectedContacts.includes(contact.id)}
+                                onCheckedChange={() =>
+                                  handleToggleContact(contact.id)
+                                }
+                              />
+                              <label
+                                htmlFor={contact.id}
+                                className="text-sm cursor-pointer flex-1"
+                              >
+                                {contact.name || contact.phone_number}
+                                {contact.name && (
+                                  <span className="text-muted-foreground ml-2">
+                                    ({contact.phone_number})
+                                  </span>
+                                )}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )
                     )}
                   </div>
                 </div>

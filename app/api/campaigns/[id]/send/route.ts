@@ -8,9 +8,6 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // TODO: Add authentication when ready
-    // const user = await requirePayingUser(request)
-
     const { id } = params
 
     // Fetch campaign
@@ -80,12 +77,12 @@ export async function POST(
       message: "Campaign is being sent",
       recipientCount: recipients.length,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in POST /api/campaigns/[id]/send:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      )
   }
 }
 

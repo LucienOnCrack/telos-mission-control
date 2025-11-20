@@ -11,9 +11,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // TODO: Add authentication when ready
-    // const user = await requirePayingUser(request)
-
     const { id } = params
 
     // Fetch campaign
@@ -69,12 +66,12 @@ export async function GET(
         call_logs: callLogs,
       },
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in GET /api/campaigns/[id]:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      )
   }
 }
 

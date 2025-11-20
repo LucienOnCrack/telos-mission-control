@@ -8,16 +8,22 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
   throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
 }
 
-// Create a single supabase client for interacting with your database
+// Client-side Supabase client (for use in browser)
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-// Server-side client with service role for admin operations
+// Server-side client with service role for admin operations (bypasses RLS)
 export const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 )
 
 // Database types
@@ -25,10 +31,21 @@ export type CampaignType = 'sms' | 'voice' | 'whatsapp'
 export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed'
 export type RecipientStatus = 'pending' | 'sent' | 'delivered' | 'failed'
 
+export interface ContactGroup {
+  id: string
+  name: string
+  description?: string
+  created_at: string
+  updated_at: string
+  contact_count?: number
+  contacts?: Contact[]
+}
+
 export interface Contact {
   id: string
   phone_number: string
   name?: string
+  group_id?: string
   created_at: string
   updated_at: string
 }

@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase"
-// import { requirePayingUser } from "@/lib/auth" // TODO: Uncomment when auth is ready
 
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Add authentication when ready
-    // const user = await requirePayingUser(request)
-
     // Get total campaigns
     const { count: totalCampaigns } = await supabaseAdmin
       .from("campaigns")
