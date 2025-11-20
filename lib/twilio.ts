@@ -131,8 +131,7 @@ export async function initiateVoiceCall(
     console.log('🚀 Making Twilio API call...')
     
     // Create TwiML for playing audio
-    // Using asyncAmd means audio plays immediately while machine detection happens in background
-    // If voicemail is detected, we mark it as failed but audio has already started playing
+    // Audio plays immediately when call is answered
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Play>${audioUrl}</Play>
@@ -148,14 +147,8 @@ export async function initiateVoiceCall(
       twiml,
       statusCallback: finalWebhookUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-      statusCallbackMethod: 'POST',
-      // Use 'Enable' for fast detection with minimal delay (audio starts almost immediately)
-      // This detects voicemail but doesn't wait for the beep, so audio plays faster
-      machineDetection: 'Enable',
-      asyncAmd: 'true', // Detect in background while audio plays
-      asyncAmdStatusCallback: finalWebhookUrl,
-      asyncAmdStatusCallbackMethod: 'POST'
-    } as any)
+      statusCallbackMethod: 'POST'
+    })
 
     logSuccess(context, {
       callSid: call.sid,
