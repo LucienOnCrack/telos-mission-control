@@ -35,10 +35,19 @@ import { Plus, Send } from "lucide-react"
 import { Campaign, Contact, CampaignType } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
+interface AudioFile {
+  url: string
+  pathname: string
+  size: number
+  uploadedAt: Date
+  filename: string
+}
+
 export default function CampaignsPage() {
   const router = useRouter()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [audioFiles, setAudioFiles] = useState<AudioFile[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -57,6 +66,7 @@ export default function CampaignsPage() {
   useEffect(() => {
     fetchCampaigns()
     fetchContacts()
+    fetchAudioFiles()
   }, [])
 
   const fetchCampaigns = async () => {
@@ -99,6 +109,24 @@ export default function CampaignsPage() {
       }
     } catch (error: any) {
       console.error("❌ ERROR fetching contacts:", error)
+    }
+  }
+
+  const fetchAudioFiles = async () => {
+    try {
+      const response = await fetch("/api/audio/list")
+      
+      if (!response.ok) {
+        console.error("❌ Failed to fetch audio files")
+        return
+      }
+      
+      const data = await response.json()
+      if (data.files) {
+        setAudioFiles(data.files)
+      }
+    } catch (error: any) {
+      console.error("❌ ERROR fetching audio files:", error)
     }
   }
 
@@ -303,7 +331,41 @@ export default function CampaignsPage() {
                   </div>
                 ) : (
                   <div className="grid gap-2">
-                    <Label htmlFor="audioUrl">Audio URL</Label>
+                    <Label htmlFor="audioUrl">Audio File</Label>
+                    {audioFiles.length > 0 ? (
+                      <div className="space-y-2">
+                        <Select
+                          value={audioUrl}
+                          onValueChange={setAudioUrl}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an uploaded audio file" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {audioFiles.map((file) => (
+                              <SelectItem key={file.url} value={file.url}>
+                                {file.filename}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Or enter a custom URL below
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mb-2">
+                        No audio files uploaded yet.{" "}
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto p-0"
+                          onClick={() => router.push("/dashboard/audio")}
+                        >
+                          Upload one now
+                        </Button>
+                      </p>
+                    )}
                     <Input
                       id="audioUrl"
                       placeholder="https://example.com/audio.mp3"

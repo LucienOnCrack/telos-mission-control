@@ -1,12 +1,13 @@
 # Telos Mission Control
 
-A comprehensive mass messaging and calling platform built with Next.js, React, Supabase, and Telnyx API.
+A comprehensive mass messaging and calling platform built with Next.js, React, Supabase, and Twilio API.
 
 ## Features
 
 ### Core Functionality
 - 📱 **SMS Mass Messaging** - Send SMS to multiple contacts instantly or scheduled
 - ☎️ **Voice Campaigns** - Automated voice calls with prerecorded messages
+- 🎵 **Audio File Hosting** - Built-in Vercel Blob storage for audio files
 - 💬 **WhatsApp Support** - Ready for WhatsApp integration (coming soon)
 - 📅 **Campaign Scheduling** - Schedule campaigns for future delivery
 - 📊 **Real-time Tracking** - Monitor delivery status and call analytics
@@ -55,7 +56,8 @@ Copy `.env.local.template` to `.env.local` and fill in your credentials:
 
 Required credentials:
 - Supabase project URL and keys
-- Telnyx API key and phone number
+- Twilio Account SID, Auth Token, and phone number
+- Vercel Blob storage token (optional, for audio hosting)
 - App URL and cron secret
 
 ### 3. Set Up Database
@@ -71,16 +73,26 @@ supabase db push
 # and run in SQL Editor
 ```
 
-### 4. Configure Telnyx
+### 4. Configure Twilio
 
-1. Purchase a phone number from [Telnyx Dashboard](https://portal.telnyx.com/#/app/numbers/buy-numbers)
-2. Set up webhook URL: `https://your-domain.com/api/telnyx/webhook`
-3. Enable webhook events for SMS and Voice
-4. For voice calls, create a Call Control Application
+1. Create a Twilio account at [twilio.com/try-twilio](https://www.twilio.com/try-twilio)
+2. Purchase a phone number with Voice capabilities
+3. Set up webhook URL: `https://your-domain.com/api/twilio/webhook`
+4. Add credentials to environment variables
 
-See [SETUP.md](./SETUP.md) for detailed configuration steps.
+See [TWILIO_SETUP.md](./TWILIO_SETUP.md) for detailed configuration steps.
 
-### 5. Run Development Server
+### 5. Set Up Audio Hosting (Optional)
+
+For voice campaigns, set up Vercel Blob storage:
+
+1. Enable Blob Storage in Vercel Dashboard
+2. Connect to your project
+3. Pull environment variables locally
+
+See [AUDIO_SETUP.md](./AUDIO_SETUP.md) for complete audio hosting setup.
+
+### 6. Run Development Server
 
 ```bash
 npm run dev
@@ -96,6 +108,7 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 - `/dashboard/contacts` - Contact management (add, import, delete)
 - `/dashboard/campaigns` - Campaign creation and management
 - `/dashboard/campaigns/[id]` - Campaign details with delivery tracking
+- `/dashboard/audio` - Audio file management for voice campaigns
 - `/dashboard/table` - Mission data table with sorting capabilities
 
 ### API Routes
@@ -105,7 +118,10 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 - `/api/campaigns` - Campaign creation and listing
 - `/api/campaigns/[id]` - Campaign details
 - `/api/campaigns/[id]/send` - Trigger campaign sending
-- `/api/telnyx/webhook` - Webhook handler for Telnyx events
+- `/api/audio/upload` - Upload audio files to Vercel Blob
+- `/api/audio/list` - List uploaded audio files
+- `/api/audio/delete` - Delete audio files
+- `/api/twilio/webhook` - Webhook handler for Twilio events
 - `/api/cron/scheduled-campaigns` - Scheduled campaign processor
 
 ## Tech Stack
@@ -116,7 +132,8 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 - [shadcn/ui](https://ui.shadcn.com/) - UI components
 - [Lucide React](https://lucide.dev/) - Icons
 - [Supabase](https://supabase.com/) - Database and authentication
-- [Telnyx](https://telnyx.com/) - SMS and Voice API
+- [Twilio](https://twilio.com/) - SMS and Voice API
+- [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) - Audio file storage
 - [date-fns](https://date-fns.org/) - Date utilities
 
 ## Project Structure
@@ -181,13 +198,18 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
    - Select recipients
    - Click "Create Campaign"
 
-3. **Create Voice Campaign**
-   - Upload audio file (MP3/WAV) to public URL
+3. **Upload Audio Files** (For Voice Campaigns)
+   - Go to Audio Files page
+   - Upload MP3, WAV, or M4A files
+   - Files are automatically hosted on Vercel Blob
+   - See [AUDIO_SETUP.md](./AUDIO_SETUP.md) for details
+
+4. **Create Voice Campaign**
    - Create new campaign with "Voice" type
-   - Enter audio URL
+   - Select uploaded audio file or enter custom URL
    - Select recipients and send
 
-4. **Monitor Campaign**
+5. **Monitor Campaign**
    - Click on campaign in list to view details
    - See real-time delivery status
    - Track call answers and duration (voice campaigns)
@@ -196,6 +218,8 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 ## Documentation
 
 - [SETUP.md](./SETUP.md) - Complete setup and configuration guide
+- [TWILIO_SETUP.md](./TWILIO_SETUP.md) - Twilio configuration and voice call setup
+- [AUDIO_SETUP.md](./AUDIO_SETUP.md) - Audio file hosting with Vercel Blob
 - [SECURITY.md](./SECURITY.md) - Security implementation details
 - [TEST_PLAN.md](./TEST_PLAN.md) - Comprehensive testing guide
 
@@ -218,9 +242,9 @@ All phone numbers must be in E.164 format:
 
 For production deployment:
 1. Deploy to Vercel or your hosting provider
-2. Configure webhook URL in Telnyx dashboard
-3. Enable required webhook events
-4. Test webhook with test campaigns
+2. Configure webhook URL in Twilio dashboard
+3. Test webhook with test campaigns
+4. See [TWILIO_SETUP.md](./TWILIO_SETUP.md) for details
 
 ### Scheduled Campaigns
 
@@ -232,15 +256,22 @@ Scheduled campaigns require the cron job to run:
 
 ### Messages Not Sending
 
-1. Check Telnyx API key is correct
+1. Check Twilio credentials are correct
 2. Verify phone number is configured
 3. Ensure phone numbers are in E.164 format
-4. Check Telnyx account balance
+4. Check Twilio account balance
+
+### Voice Calls Not Working
+
+1. Verify audio file URL is publicly accessible (HTTPS)
+2. Check audio format is supported (MP3, WAV, M4A)
+3. Test audio URL in browser first
+4. See [AUDIO_SETUP.md](./AUDIO_SETUP.md) for troubleshooting
 
 ### Webhooks Not Working
 
 1. Verify webhook URL is publicly accessible
-2. Check webhook is configured in Telnyx dashboard
+2. Check webhook is configured in Twilio dashboard
 3. Review server logs for incoming webhook calls
 4. Test with ngrok for local development
 
@@ -254,9 +285,13 @@ Scheduled campaigns require the cron job to run:
 ## Support
 
 For issues or questions:
-1. Check documentation files (SETUP.md, SECURITY.md)
-2. Review TEST_PLAN.md for testing guidance
-3. Check Telnyx API documentation: https://developers.telnyx.com/
+1. Check documentation files:
+   - [SETUP.md](./SETUP.md) - General setup
+   - [TWILIO_SETUP.md](./TWILIO_SETUP.md) - Twilio configuration
+   - [AUDIO_SETUP.md](./AUDIO_SETUP.md) - Audio hosting setup
+   - [SECURITY.md](./SECURITY.md) - Security details
+2. Review [TEST_PLAN.md](./TEST_PLAN.md) for testing guidance
+3. Check Twilio API documentation: https://www.twilio.com/docs
 
 ## License
 

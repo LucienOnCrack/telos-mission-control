@@ -127,6 +127,20 @@ Twilio supports these audio formats for the `<Play>` verb:
 
 ### Audio File Hosting
 
+**🎉 RECOMMENDED: Use Built-in Vercel Blob Storage**
+
+We've integrated Vercel Blob storage for easy audio file hosting!
+
+1. Go to **Dashboard** → **Audio Files** (`/dashboard/audio`)
+2. Upload your MP3, WAV, or M4A files
+3. Select them directly when creating voice campaigns
+
+**For setup instructions, see:** [AUDIO_SETUP.md](./AUDIO_SETUP.md)
+
+---
+
+**Alternative: Use External URLs**
+
 Your audio file **MUST** be:
 
 1. ✅ Publicly accessible via HTTPS
@@ -140,6 +154,7 @@ Your audio file **MUST** be:
 ✅ https://yoursite.com/audio/message.mp3
 ✅ https://s3.amazonaws.com/bucket/audio.wav
 ✅ https://storage.googleapis.com/bucket/audio.mp3
+✅ https://xxx.public.blob.vercel-storage.com/audio/message.mp3
 ```
 
 **Bad URLs:**
@@ -150,25 +165,17 @@ Your audio file **MUST** be:
 ❌ file:///local/audio.wav  (local file)
 ```
 
-### Converting YouTube to Audio
+### Converting Audio Files
 
-If you want to use audio from YouTube:
+If you need to convert audio to the optimal format:
 
-1. **Extract audio** using a tool like:
-   - https://ytmp3.nu/
-   - https://y2mate.com/
-   - Or use `yt-dlp` command line tool
+**Using FFmpeg (Best Quality for Phone Calls):**
+```bash
+ffmpeg -i input.mp3 -ar 8000 -ac 1 -sample_fmt s16 output.wav
+```
 
-2. **Convert to recommended format** (8kHz WAV):
-   ```bash
-   ffmpeg -i input.mp3 -ar 8000 -ac 1 -sample_fmt s16 output.wav
-   ```
-
-3. **Upload to hosting** (examples):
-   - AWS S3
-   - Google Cloud Storage
-   - Vercel Blob
-   - Any HTTPS web server
+**For more conversion options and audio hosting setup:**
+- See detailed guide: [AUDIO_SETUP.md](./AUDIO_SETUP.md)
 
 ---
 
@@ -371,7 +378,7 @@ Before going live, make sure:
 - [ ] Phone number purchased with Voice capability
 - [ ] Environment variables configured (local and production)
 - [ ] Database migration applied
-- [ ] Audio files uploaded and accessible via HTTPS
+- [ ] Audio files uploaded to Vercel Blob (see [AUDIO_SETUP.md](./AUDIO_SETUP.md))
 - [ ] Webhook configured in Twilio Console
 - [ ] Test call completed successfully
 - [ ] Monitoring/logging working
