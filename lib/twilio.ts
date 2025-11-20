@@ -136,11 +136,15 @@ export async function initiateVoiceCall(
   <Play>${audioUrl}</Play>
 </Response>`
 
+    const finalWebhookUrl = webhookUrl || `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/webhook`
+    console.log(`🔔 Webhook URL being sent to Twilio: "${finalWebhookUrl}"`)
+    console.log(`📊 Webhook events requested: ['initiated', 'ringing', 'answered', 'completed']`)
+
     const call = await twilioClient.calls.create({
       to,
       from: TWILIO_PHONE_NUMBER,
       twiml,
-      statusCallback: webhookUrl || `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/webhook`,
+      statusCallback: finalWebhookUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       statusCallbackMethod: 'POST',
     })
