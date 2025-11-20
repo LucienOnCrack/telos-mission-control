@@ -160,32 +160,44 @@ async function handleVoiceCallEvent(data: any) {
 
       case 'in-progress':
       case 'answered':
+        // This status means the call was DEFINITIVELY answered and connected
         console.log(`✅ Call answered by ${to}`)
         await updateCallLog(callSid, {
+          call_status: 'in-progress',
           answered: true,
           answered_at: new Date().toISOString(),
-          call_status: 'answered',
         })
         
-        // Update campaign recipient status
+        // Update campaign recipient status to delivered
         await updateRecipientStatus(callSid, 'delivered')
         break
 
       case 'completed':
         console.log(`🏁 Call completed to ${to}`)
+        
+        // Get the current call log to check if it was answered
+        const { data: existingLog } = await supabaseAdmin
+          .from("call_logs")
+          .select("answered")
+          .eq("twilio_call_sid", callSid)
+          .single()
+        
+        const wasAnswered = existingLog?.answered || false
+        
+        console.log(`   Was Answered: ${wasAnswered}`)
         console.log(`   Duration: ${callDuration} seconds`)
         
-        const wasAnswered = callDuration > 0
-        
+        // Only record duration if the call was answered
+        // Unanswered calls shouldn't have meaningful duration tracked
         await updateCallLog(callSid, {
           call_status: 'completed',
-          duration_seconds: callDuration,
+          duration_seconds: wasAnswered ? callDuration : 0,
           ended_at: new Date().toISOString(),
-          answered: wasAnswered,
         })
         
-        if (wasAnswered) {
-          await updateRecipientStatus(callSid, 'delivered')
+        // If it wasn't marked as answered during in-progress, mark as failed
+        if (!wasAnswered) {
+          await updateRecipientStatus(callSid, 'failed', 'Call completed without being answered')
         }
         break
 
@@ -193,9 +205,12 @@ async function handleVoiceCallEvent(data: any) {
       case 'failed':
       case 'no-answer':
       case 'canceled':
+        // These statuses DEFINITIVELY mean the call was NOT answered
         console.log(`❌ Call ${callStatus} for ${to}`)
         await updateCallLog(callSid, {
           call_status: callStatus,
+          answered: false,
+          duration_seconds: 0,
           ended_at: new Date().toISOString(),
         })
         

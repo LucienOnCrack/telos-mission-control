@@ -110,6 +110,75 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(10)
 
+    // Get time-series data for the last 30 days
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const { data: timeSeriesData } = await supabaseAdmin
+      .from("campaign_recipients")
+      .select("created_at, status")
+      .gte("created_at", thirtyDaysAgo.toISOString())
+      .order("created_at", { ascending: true })
+
+    // Get call logs time-series
+    const { data: callLogsTimeSeries } = await supabaseAdmin
+      .from("call_logs")
+      .select("created_at, answered, call_status")
+      .gte("created_at", thirtyDaysAgo.toISOString())
+      .order("created_at", { ascending: true })
+
+    // Process time-series data into daily buckets
+    const dailyStats = new Map<string, {
+      date: string
+      totalCalls: number
+      successful: number
+      failed: number
+      answered: number
+      pending: number
+    }>()
+
+    // Initialize all days in the last 30 days
+    for (let i = 0; i < 30; i++) {
+      const date = new Date()
+      date.setDate(date.getDate() - (29 - i))
+      const dateStr = date.toISOString().split('T')[0]
+      dailyStats.set(dateStr, {
+        date: dateStr,
+        totalCalls: 0,
+        successful: 0,
+        failed: 0,
+        answered: 0,
+        pending: 0,
+      })
+    }
+
+    // Populate with actual data from campaign_recipients
+    timeSeriesData?.forEach((record) => {
+      const dateStr = record.created_at.split('T')[0]
+      const stats = dailyStats.get(dateStr)
+      if (stats) {
+        stats.totalCalls++
+        if (record.status === 'delivered' || record.status === 'sent') {
+          stats.successful++
+        } else if (record.status === 'failed') {
+          stats.failed++
+        } else if (record.status === 'pending') {
+          stats.pending++
+        }
+      }
+    })
+
+    // Add answered calls data
+    callLogsTimeSeries?.forEach((log) => {
+      const dateStr = log.created_at.split('T')[0]
+      const stats = dailyStats.get(dateStr)
+      if (stats && log.answered) {
+        stats.answered++
+      }
+    })
+
+    const chartData = Array.from(dailyStats.values())
+
     return NextResponse.json({
       overview: {
         totalCampaigns: totalCampaigns || 0,
@@ -130,6 +199,7 @@ export async function GET(request: NextRequest) {
       },
       recentCampaigns,
       recentActivity,
+      chartData,
     })
   } catch (error) {
     console.error("Error fetching analytics:", error)

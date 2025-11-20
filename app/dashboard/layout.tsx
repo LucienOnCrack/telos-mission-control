@@ -1,6 +1,6 @@
 "use client"
 
-import { Phone, Send, Music } from "lucide-react"
+import { Phone, Send, Music, LayoutDashboard } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -17,6 +17,11 @@ import {
 } from "@/components/ui/sidebar"
 
 const menuItems = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: LayoutDashboard,
+  },
   {
     title: "Contacts",
     url: "/dashboard/contacts",
