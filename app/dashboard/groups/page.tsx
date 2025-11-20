@@ -206,7 +206,18 @@ export default function GroupsPage() {
 
         if (response.ok) {
           console.log(`✅ Successfully imported ${data.count} contacts`)
-          alert(`✅ Successfully imported ${data.count} contacts to this group!`)
+          
+          let message = `✅ Successfully imported ${data.count} new contacts to this group!`
+          
+          if (data.skipped > 0) {
+            message += `\n\n⏭️ Skipped ${data.skipped} contacts (already exist in database)`
+          }
+          
+          if (data.message) {
+            message = `ℹ️ ${data.message}`
+          }
+          
+          alert(message)
           fetchGroups() // Refresh to update contact counts
         } else {
           console.error(`❌ Import failed:`, data)

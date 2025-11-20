@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate and format all contacts
-    const validContacts = []
+    const validContactsMap = new Map<string, { phone_number: string; name: string | null; group_id: string | null }>()
     const errors = []
 
     for (const contact of contacts) {
@@ -41,12 +41,15 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      validContacts.push({
+      // Deduplicate by phone number (keep the last occurrence)
+      validContactsMap.set(formattedPhone, {
         phone_number: formattedPhone,
         name: contact.name || null,
         group_id: contact.group_id || null,
       })
     }
+
+    const validContacts = Array.from(validContactsMap.values())
 
     if (validContacts.length === 0) {
       return NextResponse.json(
@@ -55,15 +58,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`📥 Importing ${validContacts.length} contacts...`)
+    console.log(`📥 Checking ${validContacts.length} unique contacts (from ${contacts.length} total)...`)
 
-    // Insert or update contacts (upsert will update group_id if contact already exists)
+    // Check which phone numbers already exist
+    const phoneNumbers = validContacts.map(c => c.phone_number)
+    const { data: existingContacts } = await supabaseAdmin
+      .from("contacts")
+      .select("phone_number")
+      .in("phone_number", phoneNumbers)
+
+    const existingPhones = new Set(existingContacts?.map(c => c.phone_number) || [])
+
+    // Filter out existing contacts
+    const newContacts = validContacts.filter(c => !existingPhones.has(c.phone_number))
+    
+    // Add existing contacts to errors array
+    const skippedContacts = validContacts.filter(c => existingPhones.has(c.phone_number))
+    skippedContacts.forEach(contact => {
+      errors.push({ 
+        phone_number: contact.phone_number, 
+        error: "Phone number already exists in database - skipped" 
+      })
+      console.log(`⏭️ Skipping existing contact: ${contact.phone_number}`)
+    })
+
+    if (newContacts.length === 0) {
+      console.log(`ℹ️ No new contacts to import - all ${validContacts.length} contacts already exist`)
+      return NextResponse.json({
+        count: 0,
+        contacts: [],
+        errors,
+        message: `All ${validContacts.length} contacts already exist in database`
+      })
+    }
+
+    console.log(`📥 Importing ${newContacts.length} new contacts (${skippedContacts.length} skipped as already existing)...`)
+
+    // Insert only new contacts
     const { data: insertedContacts, error } = await supabaseAdmin
       .from("contacts")
-      .upsert(validContacts, { 
-        onConflict: "phone_number",
-        ignoreDuplicates: false 
-      })
+      .insert(newContacts)
       .select()
 
     if (error) {
@@ -77,11 +111,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`✅ Successfully imported ${insertedContacts?.length || 0} contacts`)
+    console.log(`✅ Successfully imported ${insertedContacts?.length || 0} new contacts`)
 
     return NextResponse.json({
       count: insertedContacts?.length || 0,
       contacts: insertedContacts,
+      skipped: skippedContacts.length,
       errors: errors.length > 0 ? errors : undefined,
     })
   } catch (error: any) {

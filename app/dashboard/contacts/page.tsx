@@ -202,11 +202,22 @@ export default function ContactsPage() {
 
         if (response.ok) {
           console.log(`✅ Successfully imported ${data.count} contacts`)
-          alert(`✅ Successfully imported ${data.count} contacts!${data.errors ? `\n\n⚠️ ${data.errors.length} errors` : ''}`)
+          
+          let message = `✅ Successfully imported ${data.count} new contacts!`
+          
+          if (data.skipped > 0) {
+            message += `\n\n⏭️ Skipped ${data.skipped} contacts (already exist in database)`
+          }
+          
+          if (data.message) {
+            message = `ℹ️ ${data.message}`
+          }
+          
+          alert(message)
           fetchContacts()
         } else {
           console.error(`❌ Import failed:`, data)
-          alert(`❌ Import failed:\n\n${data.error || 'Unknown error'}${data.errors ? `\n\nErrors: ${data.errors.length}` : ''}`)
+          alert(`❌ Import failed:\n\n${data.error || 'Unknown error'}${data.details ? `\n\nDetails: ${data.details}` : ''}`)
         }
       } catch (error) {
         console.error("❌ Error importing contacts:", error)
