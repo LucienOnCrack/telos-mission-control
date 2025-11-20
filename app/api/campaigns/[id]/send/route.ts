@@ -93,22 +93,41 @@ export async function POST(
 async function sendCampaignMessages(campaign: any, recipients: any[]) {
   const startTime = new Date()
   const errors: any[] = []
+  const BATCH_SIZE = 20 // Twilio recommended limit
+  const BATCH_DELAY_MS = 100 // 100ms between batches
 
   console.log('═'.repeat(80))
   console.log(`🚀 STARTING CAMPAIGN: ${campaign.id}`)
   console.log(`📊 Type: ${campaign.type}`)
   console.log(`👥 Recipients: ${recipients.length}`)
   console.log(`⏰ Started: ${startTime.toISOString()}`)
-  console.log(`🔥 MODE: PARALLEL (All calls at once!)`)
+  console.log(`🔥 MODE: BATCHED PARALLEL (${BATCH_SIZE} calls per batch, ${BATCH_DELAY_MS}ms delay)`)
   console.log('═'.repeat(80))
 
-  // Process all recipients in parallel
-  const results = await Promise.allSettled(
-    recipients.map(async (recipient, i) => {
-      const phoneNumber = recipient.contact.phone_number
-      const recipientNumber = i + 1
-      
-      console.log(`\n📞 [${recipientNumber}/${recipients.length}] Processing: ${phoneNumber}`)
+  // Split recipients into batches
+  const batches: any[][] = []
+  for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+    batches.push(recipients.slice(i, i + BATCH_SIZE))
+  }
+  
+  console.log(`📦 Split into ${batches.length} batches of up to ${BATCH_SIZE} recipients`)
+
+  // Process each batch sequentially, but recipients within batch in parallel
+  const allResults: any[] = []
+  
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batch = batches[batchIndex]
+    const batchNumber = batchIndex + 1
+    
+    console.log(`\n🔄 Processing batch ${batchNumber}/${batches.length} (${batch.length} recipients)`)
+    
+    const batchResults = await Promise.allSettled(
+      batch.map(async (recipient, i) => {
+        const overallIndex = batchIndex * BATCH_SIZE + i
+        const phoneNumber = recipient.contact.phone_number
+        const recipientNumber = overallIndex + 1
+        
+        console.log(`📞 [${recipientNumber}/${recipients.length}] Processing: ${phoneNumber}`)
       
       try {
       if (campaign.type === "sms") {
@@ -290,14 +309,25 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
         })
         .eq("id", recipient.id)
       
-      return { success: false, phone: phoneNumber, error }
+        return { success: false, phone: phoneNumber, error }
       }
-    })
-  )
+      })
+    )
+    
+    allResults.push(...batchResults)
+    
+    console.log(`✅ Batch ${batchNumber}/${batches.length} completed`)
+    
+    // Add delay between batches (except after last batch)
+    if (batchIndex < batches.length - 1) {
+      console.log(`⏸️  Waiting ${BATCH_DELAY_MS}ms before next batch...`)
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS))
+    }
+  }
 
-  // Count results
-  const successCount = results.filter(r => r.status === 'fulfilled' && r.value?.success).length
-  const failCount = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value?.success)).length
+  // Count results from all batches
+  const successCount = allResults.filter(r => r.status === 'fulfilled' && r.value?.success).length
+  const failCount = allResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value?.success)).length
 
   // Update campaign status to completed
   const finalStatus = failCount === recipients.length ? "failed" : "completed"
@@ -312,11 +342,12 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
   const endTime = new Date()
   const durationSeconds = ((endTime.getTime() - startTime.getTime()) / 1000).toFixed(2)
   
-  console.log('═'.repeat(80))
+  console.log('\n' + '═'.repeat(80))
   console.log(`🏁 CAMPAIGN COMPLETED: ${campaign.id}`)
   console.log(`⏰ Started: ${startTime.toISOString()}`)
   console.log(`⏰ Finished: ${endTime.toISOString()}`)
-  console.log(`⚡ Duration: ${durationSeconds}s (🔥 PARALLEL MODE)`)
+  console.log(`⚡ Duration: ${durationSeconds}s`)
+  console.log(`📦 Batches: ${batches.length} (${BATCH_SIZE} per batch)`)
   console.log(`✅ Successful: ${successCount}/${recipients.length}`)
   console.log(`❌ Failed: ${failCount}/${recipients.length}`)
   console.log(`📊 Success Rate: ${((successCount / recipients.length) * 100).toFixed(2)}%`)
