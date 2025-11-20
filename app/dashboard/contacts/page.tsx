@@ -122,7 +122,7 @@ export default function ContactsPage() {
         const line = lines[i].trim()
         if (!line) continue
 
-        const [phone, name] = line.split(",").map((s) => s.trim())
+        const [phone, name] = line.split(",").map((s: string) => s.trim())
         if (phone) {
           newContacts.push({ phone_number: phone, name: name || undefined })
         }
