@@ -160,44 +160,36 @@ async function handleVoiceCallEvent(data: any) {
 
       case 'in-progress':
       case 'answered':
-        // This status means the call was DEFINITIVELY answered and connected
-        console.log(`✅ Call answered by ${to}`)
+        // Don't mark as answered yet - wait for completed event to check duration
+        // in-progress can fire even for calls that are immediately declined
+        console.log(`📞 Call in-progress with ${to}`)
         await updateCallLog(callSid, {
           call_status: 'in-progress',
-          answered: true,
-          answered_at: new Date().toISOString(),
         })
-        
-        // Update campaign recipient status to delivered
-        await updateRecipientStatus(callSid, 'delivered')
         break
 
       case 'completed':
         console.log(`🏁 Call completed to ${to}`)
-        
-        // Get the current call log to check if it was answered
-        const { data: existingLog } = await supabaseAdmin
-          .from("call_logs")
-          .select("answered")
-          .eq("twilio_call_sid", callSid)
-          .single()
-        
-        const wasAnswered = existingLog?.answered || false
-        
-        console.log(`   Was Answered: ${wasAnswered}`)
         console.log(`   Duration: ${callDuration} seconds`)
         
-        // Only record duration if the call was answered
-        // Unanswered calls shouldn't have meaningful duration tracked
+        // ONLY mark as answered if duration is at least 3 seconds
+        // Declined calls will have 0-2 seconds, answered calls will have 3+ seconds
+        const wasAnswered = callDuration >= 3
+        
+        console.log(`   Was Answered: ${wasAnswered} (threshold: 3 seconds)`)
+        
         await updateCallLog(callSid, {
           call_status: 'completed',
-          duration_seconds: wasAnswered ? callDuration : 0,
+          duration_seconds: callDuration,
+          answered: wasAnswered,
+          answered_at: wasAnswered ? new Date().toISOString() : null,
           ended_at: new Date().toISOString(),
         })
         
-        // If it wasn't marked as answered during in-progress, mark as failed
-        if (!wasAnswered) {
-          await updateRecipientStatus(callSid, 'failed', 'Call completed without being answered')
+        if (wasAnswered) {
+          await updateRecipientStatus(callSid, 'delivered')
+        } else {
+          await updateRecipientStatus(callSid, 'failed', 'Call declined or not answered')
         }
         break
 
