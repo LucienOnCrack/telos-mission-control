@@ -174,9 +174,15 @@ export default function ContactsPage() {
         const name = nameIndex >= 0 ? values[nameIndex] : undefined
 
         if (phone) {
-          // Ensure phone has + prefix (will be added by formatPhoneNumber if missing)
+          // Handle phone numbers with or without + prefix
+          // Remove any spaces or special characters except + and digits
+          let cleanedPhone = phone.replace(/[^\d+]/g, '')
+          // Ensure it starts with +
+          if (!cleanedPhone.startsWith('+')) {
+            cleanedPhone = '+' + cleanedPhone
+          }
           newContacts.push({ 
-            phone_number: phone.startsWith('+') ? phone : `+${phone}`, 
+            phone_number: cleanedPhone,
             name: name || undefined 
           })
         }
@@ -303,19 +309,20 @@ export default function ContactsPage() {
               <TableHead>Name</TableHead>
               <TableHead>Phone Number</TableHead>
               <TableHead>Added</TableHead>
+              <TableHead>Last Contacted</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center">
+                <TableCell colSpan={5} className="text-center">
                   Loading contacts...
                 </TableCell>
               </TableRow>
             ) : contacts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center">
+                <TableCell colSpan={5} className="text-center">
                   No contacts found. Add your first contact to get started.
                 </TableCell>
               </TableRow>
@@ -328,6 +335,15 @@ export default function ContactsPage() {
                   <TableCell>{contact.phone_number}</TableCell>
                   <TableCell>
                     {new Date(contact.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    {contact.last_contacted_at ? (
+                      <span className="text-sm">
+                        {new Date(contact.last_contacted_at).toLocaleDateString()} {new Date(contact.last_contacted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Never</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

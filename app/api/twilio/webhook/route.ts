@@ -201,6 +201,8 @@ async function handleVoiceCallEvent(data: any) {
         
         if (wasAnswered) {
           await updateRecipientStatus(callSid, 'delivered')
+          // Update contact's last_contacted_at timestamp for answered calls
+          await updateContactLastContactedByCallSid(callSid)
         } else {
           await updateRecipientStatus(callSid, 'failed', 'Call declined or not answered')
         }
@@ -243,6 +245,8 @@ async function handleSMSEvent(data: any) {
           status: 'delivered',
           delivered_at: new Date().toISOString(),
         })
+        // Update contact's last_contacted_at timestamp
+        await updateContactLastContacted(to)
         break
 
       case 'undelivered':
@@ -347,6 +351,60 @@ async function updateRecipientByMessageSid(messageSid: string, updates: any) {
   }
   
   console.log(`✅ Recipient updated successfully`)
+}
+
+/**
+ * Update contact's last_contacted_at by phone number
+ */
+async function updateContactLastContacted(phoneNumber: string) {
+  console.log(`📝 Updating last_contacted_at for ${phoneNumber}`)
+  
+  const { error } = await supabaseAdmin
+    .from("contacts")
+    .update({
+      last_contacted_at: new Date().toISOString(),
+    })
+    .eq("phone_number", phoneNumber)
+
+  if (error) {
+    console.error(`❌ Failed to update last_contacted_at:`, error)
+    // Don't throw - this is not critical enough to fail the webhook
+  } else {
+    console.log(`✅ Updated last_contacted_at for ${phoneNumber}`)
+  }
+}
+
+/**
+ * Update contact's last_contacted_at by call SID
+ */
+async function updateContactLastContactedByCallSid(callSid: string) {
+  console.log(`📝 Updating last_contacted_at for CallSid ${callSid}`)
+  
+  // First find the call log to get contact ID
+  const { data: callLog, error: fetchError } = await supabaseAdmin
+    .from("call_logs")
+    .select("contact_id, contact:contacts(phone_number)")
+    .eq("twilio_call_sid", callSid)
+    .single()
+
+  if (fetchError || !callLog) {
+    console.warn(`⚠️ Could not find call log for CallSid: ${callSid}`)
+    return
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from("contacts")
+    .update({
+      last_contacted_at: new Date().toISOString(),
+    })
+    .eq("id", callLog.contact_id)
+
+  if (updateError) {
+    console.error(`❌ Failed to update last_contacted_at:`, updateError)
+    // Don't throw - this is not critical enough to fail the webhook
+  } else {
+    console.log(`✅ Updated last_contacted_at for contact ${callLog.contact_id}`)
+  }
 }
 
 // Allow GET for verification

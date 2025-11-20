@@ -48,6 +48,7 @@ export interface Contact {
   group_id?: string
   created_at: string
   updated_at: string
+  last_contacted_at?: string
 }
 
 export interface Campaign {
