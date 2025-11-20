@@ -100,7 +100,7 @@ async function handleVoiceCallEvent(data: any) {
         .from("campaign_recipients")
         .select("*, campaign:campaigns(*), contact:contacts(*)")
         .eq("contact.phone_number", to)
-        .eq("status", "pending")
+        .in("status", ["pending", "sent"])  // Include both pending and sent
         .order("created_at", { ascending: false })
         .limit(1)
         .single()
