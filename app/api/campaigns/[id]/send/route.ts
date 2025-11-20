@@ -187,7 +187,8 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
         
         const result = await initiateVoiceCall(
           phoneNumber,
-          campaign.audio_url
+          campaign.audio_url,
+          `${process.env.NEXT_PUBLIC_APP_URL || 'https://telos-mission-control.vercel.app'}/api/twilio/webhook`
         )
 
         if (!result.success) {
