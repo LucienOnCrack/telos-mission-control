@@ -87,16 +87,48 @@ async function handleVoiceCallEvent(data: any) {
     console.log(`🤖 Answered by: ${answeredBy}`)
   }
   
-  // If answered by a machine/voicemail, mark as failed immediately
-  if (answeredBy && answeredBy.startsWith('machine')) {
-    console.log(`📞 Voicemail detected for ${to} - marking as failed`)
+  // Check for definitive failure statuses first (these are more accurate than machine detection)
+  if (['busy', 'failed', 'no-answer', 'canceled'].includes(callStatus)) {
+    // Definitive failure - prioritize this over machine detection
+    const errorMessage = answeredBy?.startsWith('machine') 
+      ? `Call ${callStatus} (voicemail detected)`
+      : `Call ${callStatus}`
+    
+    console.log(`❌ Call ${callStatus} for ${to}`)
     await updateCallLog(callSid, {
-      call_status: 'machine-detected',
+      call_status: callStatus,
       answered: false,
       duration_seconds: 0,
       ended_at: new Date().toISOString(),
     })
-    await updateRecipientStatus(callSid, 'failed', 'Voicemail detected')
+    await updateRecipientStatus(callSid, 'failed', errorMessage)
+    return // Don't process further
+  }
+  
+  // If answered by a machine/voicemail (and not already handled above)
+  // With asyncAmd, this may come in a separate webhook call while audio is playing
+  if (answeredBy && answeredBy.startsWith('machine')) {
+    console.log(`📞 Voicemail detected for ${to} - marking as failed`)
+    
+    // Check if call already completed and was marked as delivered
+    const { data: existingLog } = await supabaseAdmin
+      .from("call_logs")
+      .select("call_status, answered")
+      .eq("twilio_call_sid", callSid)
+      .single()
+    
+    // Only override if not already marked as delivered (duration >= 3 sec)
+    if (!existingLog?.answered) {
+      await updateCallLog(callSid, {
+        call_status: 'machine-detected',
+        answered: false,
+        duration_seconds: 0,
+        ended_at: new Date().toISOString(),
+      })
+      await updateRecipientStatus(callSid, 'failed', 'Voicemail detected')
+    } else {
+      console.log(`ℹ️ Call was already marked as answered, ignoring machine detection`)
+    }
     return // Don't process further
   }
 
@@ -208,22 +240,6 @@ async function handleVoiceCallEvent(data: any) {
         } else {
           await updateRecipientStatus(callSid, 'failed', 'Call declined or not answered')
         }
-        break
-
-      case 'busy':
-      case 'failed':
-      case 'no-answer':
-      case 'canceled':
-        // These statuses DEFINITIVELY mean the call was NOT answered
-        console.log(`❌ Call ${callStatus} for ${to}`)
-        await updateCallLog(callSid, {
-          call_status: callStatus,
-          answered: false,
-          duration_seconds: 0,
-          ended_at: new Date().toISOString(),
-        })
-        
-        await updateRecipientStatus(callSid, 'failed', `Call ${callStatus}`)
         break
 
       default:
