@@ -6,6 +6,8 @@
 import { del } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(request: NextRequest) {
   try {
     // Check if Blob token is configured
@@ -28,15 +30,36 @@ export async function DELETE(request: NextRequest) {
 
     console.log('🗑️  Deleting audio file:', url);
 
-    // Delete from Vercel Blob
-    await del(url);
+    try {
+      // Delete from Vercel Blob
+      await del(url, {
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
 
-    console.log('✅ File deleted successfully');
+      console.log('✅ File deleted successfully from Vercel Blob');
 
-    return NextResponse.json({
-      success: true,
-      message: 'File deleted successfully',
-    });
+      return NextResponse.json({
+        success: true,
+        message: 'File deleted successfully',
+      }, {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
+    } catch (deleteError: any) {
+      console.error('❌ Vercel Blob delete error:', deleteError);
+      
+      // If the file doesn't exist, consider it a success
+      if (deleteError.message?.includes('not found') || deleteError.message?.includes('404')) {
+        console.log('⚠️ File already deleted or not found');
+        return NextResponse.json({
+          success: true,
+          message: 'File already deleted or not found',
+        });
+      }
+      
+      throw deleteError;
+    }
 
   } catch (error: any) {
     console.error('❌ Delete failed:', error);

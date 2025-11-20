@@ -43,7 +43,13 @@ export default function AudioFilesPage() {
   const fetchAudioFiles = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/audio/list")
+      // Add cache-busting timestamp
+      const response = await fetch(`/api/audio/list?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      })
       
       if (!response.ok) {
         const data = await response.json()
@@ -121,23 +127,33 @@ export default function AudioFilesPage() {
     }
 
     try {
+      // Optimistically remove from UI
+      setAudioFiles(prev => prev.filter(f => f.url !== url))
+      
       const response = await fetch(`/api/audio/delete?url=${encodeURIComponent(url)}`, {
         method: 'DELETE',
+        cache: 'no-store',
       })
 
       const data = await response.json()
 
       if (response.ok) {
         console.log('✅ File deleted:', filename)
-        alert(`✅ File deleted successfully!\n\n${filename}`)
-        fetchAudioFiles()
+        // Wait a bit for Vercel Blob to propagate the deletion
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        // Refresh the list to ensure consistency
+        await fetchAudioFiles()
       } else {
         console.error('❌ Delete failed:', data)
         alert(`❌ Delete failed:\n\n${data.error || 'Unknown error'}`)
+        // Restore the file in UI on error
+        await fetchAudioFiles()
       }
     } catch (error: any) {
       console.error('❌ Delete error:', error)
       alert(`❌ Delete error:\n\n${error.message}`)
+      // Restore the file in UI on error
+      await fetchAudioFiles()
     }
   }
 
