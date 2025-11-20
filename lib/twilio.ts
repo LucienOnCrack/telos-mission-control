@@ -76,7 +76,8 @@ function logSuccess(context: string, details?: any) {
 export async function initiateVoiceCall(
   to: string,
   audioUrl: string,
-  webhookUrl?: string
+  webhookUrl?: string,
+  useAMD: boolean = false
 ): Promise<TwilioResponse> {
   const context = 'initiateVoiceCall'
   
@@ -141,19 +142,28 @@ export async function initiateVoiceCall(
     console.log(`🔔 Webhook URL being sent to Twilio: "${finalWebhookUrl}"`)
     console.log(`📊 Webhook events requested: ['initiated', 'ringing', 'answered', 'completed']`)
 
-    const call = await twilioClient.calls.create({
+    // Build call configuration
+    const callConfig: any = {
       to,
       from: TWILIO_PHONE_NUMBER,
       twiml,
       statusCallback: finalWebhookUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-      statusCallbackMethod: 'POST',
-      // MUST use AMD to detect voicemail and prevent leaving messages
-      machineDetection: 'DetectMessageEnd',
-      asyncAmd: 'true',
-      asyncAmdStatusCallback: finalWebhookUrl,
-      asyncAmdStatusCallbackMethod: 'POST'
-    } as any)
+      statusCallbackMethod: 'POST'
+    }
+    
+    // Only add AMD if explicitly requested (not used for mass calling)
+    if (useAMD) {
+      console.log('🤖 AMD enabled for this call')
+      callConfig.machineDetection = 'DetectMessageEnd'
+      callConfig.asyncAmd = 'true'
+      callConfig.asyncAmdStatusCallback = finalWebhookUrl
+      callConfig.asyncAmdStatusCallbackMethod = 'POST'
+    } else {
+      console.log('⚡ AMD disabled - optimized for mass calling')
+    }
+    
+    const call = await twilioClient.calls.create(callConfig)
 
     logSuccess(context, {
       callSid: call.sid,

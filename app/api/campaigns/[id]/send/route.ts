@@ -94,14 +94,20 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
   const startTime = new Date()
   const errors: any[] = []
   const BATCH_SIZE = 20 // Twilio recommended limit
+  
+  // OPTIMIZED FOR MASS CALLING: Always disable AMD
   const BATCH_DELAY_MS = 100 // 100ms between batches
+  const useAMD = false // Always disabled for performance and reliability
 
   console.log('═'.repeat(80))
   console.log(`🚀 STARTING CAMPAIGN: ${campaign.id}`)
   console.log(`📊 Type: ${campaign.type}`)
   console.log(`👥 Recipients: ${recipients.length}`)
   console.log(`⏰ Started: ${startTime.toISOString()}`)
-  console.log(`🔥 MODE: BATCHED PARALLEL (${BATCH_SIZE} calls per batch, ${BATCH_DELAY_MS}ms delay)`)
+  console.log(`🔥 MODE: BATCHED PARALLEL - OPTIMIZED FOR MASS CALLING`)
+  console.log(`📦 Batch Size: ${BATCH_SIZE} calls per batch`)
+  console.log(`⏱️  Delay: ${BATCH_DELAY_MS}ms between batches`)
+  console.log(`⚡ Machine Detection: DISABLED (optimized for speed & reliability)`)
   console.log('═'.repeat(80))
 
   // Split recipients into batches
@@ -207,7 +213,8 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
         const result = await initiateVoiceCall(
           phoneNumber,
           campaign.audio_url,
-          `${process.env.NEXT_PUBLIC_APP_URL || 'https://telos-mission-control.vercel.app'}/api/twilio/webhook`
+          `${process.env.NEXT_PUBLIC_APP_URL || 'https://telos-mission-control.vercel.app'}/api/twilio/webhook`,
+          useAMD
         )
 
         if (!result.success) {
