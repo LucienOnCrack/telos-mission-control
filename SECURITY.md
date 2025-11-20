@@ -73,3 +73,5 @@ The Telnyx webhook endpoint (`/api/telnyx/webhook`) should be configured with:
 
 8. **Regular security audits**: Review and update security measures regularly
 
+
+
