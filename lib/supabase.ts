@@ -55,7 +55,7 @@ export interface CampaignRecipient {
   delivered_at?: string
   failed_at?: string
   error_message?: string
-  telnyx_message_id?: string
+  twilio_message_sid?: string
   created_at: string
   contact?: Contact
 }
@@ -64,7 +64,7 @@ export interface CallLog {
   id: string
   campaign_id: string
   contact_id: string
-  telnyx_call_id?: string
+  twilio_call_sid?: string
   answered: boolean
   duration_seconds: number
   call_status?: string
