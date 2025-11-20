@@ -267,9 +267,8 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
         failCount++
       }
 
-      // Add a small delay to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 100))
       
+      return { success: true, phone: phoneNumber }
     } catch (error: any) {
       console.error('═'.repeat(80))
       console.error(`❌ CRITICAL ERROR processing ${phoneNumber}:`)
@@ -292,9 +291,13 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
         })
         .eq("id", recipient.id)
       
-      failCount++
-    }
-  }
+      return { success: false, phone: phoneNumber, error }
+    })
+  )
+
+  // Count results
+  const successCount = results.filter(r => r.status === 'fulfilled' && r.value?.success).length
+  const failCount = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value?.success)).length
 
   // Update campaign status to completed
   const finalStatus = failCount === recipients.length ? "failed" : "completed"
@@ -306,9 +309,14 @@ async function sendCampaignMessages(campaign: any, recipients: any[]) {
     })
     .eq("id", campaign.id)
 
+  const endTime = new Date()
+  const durationSeconds = ((endTime.getTime() - startTime.getTime()) / 1000).toFixed(2)
+  
   console.log('═'.repeat(80))
   console.log(`🏁 CAMPAIGN COMPLETED: ${campaign.id}`)
-  console.log(`⏰ Finished: ${new Date().toISOString()}`)
+  console.log(`⏰ Started: ${startTime.toISOString()}`)
+  console.log(`⏰ Finished: ${endTime.toISOString()}`)
+  console.log(`⚡ Duration: ${durationSeconds}s (🔥 PARALLEL MODE)`)
   console.log(`✅ Successful: ${successCount}/${recipients.length}`)
   console.log(`❌ Failed: ${failCount}/${recipients.length}`)
   console.log(`📊 Success Rate: ${((successCount / recipients.length) * 100).toFixed(2)}%`)
