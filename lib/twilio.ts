@@ -131,6 +131,8 @@ export async function initiateVoiceCall(
     console.log('🚀 Making Twilio API call...')
     
     // Create TwiML for playing audio
+    // Note: If machine detection identifies a voicemail, the webhook will
+    // mark the call as failed before the audio plays completely
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Play>${audioUrl}</Play>
@@ -146,7 +148,15 @@ export async function initiateVoiceCall(
       twiml,
       statusCallback: finalWebhookUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-      statusCallbackMethod: 'POST'
+      statusCallbackMethod: 'POST',
+      // Enable machine detection to avoid leaving voicemails
+      machineDetection: 'DetectMessageEnd',
+      // Timeout for detection (shorter = faster, but less accurate)
+      machineDetectionTimeout: 5,
+      // If voicemail detected, hang up immediately
+      machineDetectionSpeechThreshold: 2400,
+      machineDetectionSpeechEndThreshold: 1200,
+      machineDetectionSilenceTimeout: 5000
     })
 
     logSuccess(context, {

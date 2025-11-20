@@ -78,10 +78,27 @@ async function handleVoiceCallEvent(data: any) {
   const callSid = data.CallSid
   const callStatus = data.CallStatus // initiated, ringing, in-progress, completed, busy, failed, no-answer, canceled
   const callDuration = data.CallDuration ? parseInt(data.CallDuration) : 0
+  const answeredBy = data.AnsweredBy // human, machine_start, machine_end_beep, machine_end_silence, fax, unknown
   const to = data.To
   const from = data.From
   
   console.log(`🔄 Processing voice call event: ${callStatus}`)
+  if (answeredBy) {
+    console.log(`🤖 Answered by: ${answeredBy}`)
+  }
+  
+  // If answered by a machine/voicemail, mark as failed immediately
+  if (answeredBy && answeredBy.startsWith('machine')) {
+    console.log(`📞 Voicemail detected for ${to} - marking as failed`)
+    await updateCallLog(callSid, {
+      call_status: 'machine-detected',
+      answered: false,
+      duration_seconds: 0,
+      ended_at: new Date().toISOString(),
+    })
+    await updateRecipientStatus(callSid, 'failed', 'Voicemail detected')
+    return // Don't process further
+  }
 
   try {
     // Find the call log entry
